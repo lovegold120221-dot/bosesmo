@@ -1,33 +1,18 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, linkWithPopup } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer, getDoc, setDoc, getDocFromCache } from 'firebase/firestore';
-import firebaseConfigFromFile from '../firebase-applet-config.json';
 
-const getEnv = (key: string): string | undefined => {
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    const val = import.meta.env[`VITE_${key}`] || import.meta.env[key];
-    if (val) return val;
-  }
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      const val = process.env[`VITE_${key}`] || process.env[key];
-      if (val) return val;
-    }
-  } catch (e) {
-    // ignore
-  }
-  return undefined;
-};
-
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: getEnv('FIREBASE_API_KEY') || firebaseConfigFromFile.apiKey,
-  authDomain: getEnv('FIREBASE_AUTH_DOMAIN') || firebaseConfigFromFile.authDomain,
-  projectId: getEnv('FIREBASE_PROJECT_ID') || firebaseConfigFromFile.projectId,
-  storageBucket: getEnv('FIREBASE_STORAGE_BUCKET') || firebaseConfigFromFile.storageBucket,
-  messagingSenderId: getEnv('FIREBASE_MESSAGING_SENDER_ID') || firebaseConfigFromFile.messagingSenderId,
-  appId: getEnv('FIREBASE_APP_ID') || firebaseConfigFromFile.appId,
-  measurementId: getEnv('FIREBASE_MEASUREMENT_ID') || firebaseConfigFromFile.measurementId,
-  firestoreDatabaseId: getEnv('FIREBASE_FIRESTORE_DATABASE_ID') || (firebaseConfigFromFile as any).firestoreDatabaseId,
+  apiKey: "AIzaSyDjmcE7CiKrNpSnu20gFB2cG620HU36Zqg",
+  authDomain: "gen-lang-client-0836251512.firebaseapp.com",
+  databaseURL: "https://gen-lang-client-0836251512-default-rtdb.firebaseio.com",
+  projectId: "gen-lang-client-0836251512",
+  storageBucket: "gen-lang-client-0836251512.firebasestorage.app",
+  messagingSenderId: "811711024905",
+  appId: "1:811711024905:web:b805531d56342ba41b8dd8",
+  measurementId: "G-CEGJCJ914Y",
+  firestoreDatabaseId: "master-db"
 };
 
 const app = initializeApp(firebaseConfig);

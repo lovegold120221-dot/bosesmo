@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Share, Lock, ExternalLink, Edit3, Cloud, FileText, Calendar, Mail, Folder, Users, CheckSquare, Sparkles } from 'lucide-react';
+import { Download, Share, ExternalLink, FileText, Cloud, Calendar, Mail, Folder, Users, CheckSquare, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useUI } from '../lib/state';
 
@@ -431,204 +431,212 @@ export const ArtifactOverlay: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      initial={{ opacity: 0, scale: 0.92, y: 12 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+      exit={{ opacity: 0, scale: 0.92, y: 12 }}
       transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-      className="mx-4 my-2 flex flex-col bg-[#0c0e12] rounded-[24px] overflow-hidden border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative"
-      style={{ maxHeight: '42vh', minHeight: '300px', zIndex: 20 }}
+      className="flex flex-col items-center justify-center py-3"
+      style={{ zIndex: 20, width: '100%' }}
     >
-      {/* Top Window Bar */}
-      <div className="flex items-center justify-between px-4 h-[44px] border-b border-white/5 bg-[#0c0e12] shrink-0">
-        <div className="flex items-center gap-[6px]">
-          <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f56] cursor-pointer" onClick={closeOverlay} />
-          <div className="w-[10px] h-[10px] rounded-full bg-[#ffbd2e]" />
-          <div className="w-[10px] h-[10px] rounded-full bg-[#27c93f]" />
-        </div>
-        
-        <div className="flex items-center bg-[#07090c] h-[26px] w-[70%] rounded-lg px-[10px] border border-white/5 cursor-pointer" onClick={closeOverlay}>
-          <Lock size={10} strokeWidth={2.5} className="text-[#7e8693] shrink-0" />
-          <span className="text-[10.5px] text-[#7e8693] font-normal ml-[6px] truncate whitespace-nowrap">
-            eburon.ai/workspace/{activeWorkspaceResult?.artifact?.title ? activeWorkspaceResult.artifact.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'session'}
-          </span>
+      {/* 16:9 Browser Window */}
+      <div className="w-full max-w-[90%]" style={{ aspectRatio: '16/9' }}>
+        <div className="w-full h-full flex flex-col bg-[#1e1e1e] rounded-[12px] overflow-hidden border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)] relative">
+      {/* Desktop Browser Chrome */}
+      <div className="flex flex-col shrink-0">
+        {/* Title Bar */}
+        <div className="flex items-center justify-between px-3 h-[32px] bg-[#2d2d2d] border-b border-white/5">
+          <div className="flex items-center gap-[6px]">
+            <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f56] cursor-pointer hover:bg-[#ff3b30] transition-colors" onClick={closeOverlay} />
+            <div className="w-[10px] h-[10px] rounded-full bg-[#ffbd2e]" />
+            <div className="w-[10px] h-[10px] rounded-full bg-[#27c93f]" />
+          </div>
+          <span className="text-[10px] text-[#999] font-medium">Eburon AI — Document Viewer</span>
+          <div className="w-[42px]" />
         </div>
 
-        <button className="text-[#7e8693] hover:text-[#fff] transition-colors" onClick={closeOverlay}>
-          <ExternalLink size={14} strokeWidth={2} />
-        </button>
+        {/* Tab Bar */}
+        <div className="flex items-center bg-[#252525] border-b border-white/5 h-[28px] px-1 gap-[2px]">
+          <div className="flex items-center bg-[#1e1e1e] h-[22px] px-3 rounded-t-[6px] border border-white/5 border-b-0">
+            <FileText size={10} className="text-[#cbfb45] mr-1.5 shrink-0" />
+            <span className="text-[10px] text-[#ccc] truncate max-w-[140px]">{activeWorkspaceResult?.artifact?.title || 'Document'}</span>
+          </div>
+        </div>
+
+        {/* Navigation + Address Bar */}
+        <div className="flex items-center gap-1.5 px-2 h-[32px] bg-[#2d2d2d] border-b border-white/5">
+          <button className="text-[#888] hover:text-white transition-colors p-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <button className="text-[#555] p-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg></button>
+          <button className="text-[#888] hover:text-white transition-colors p-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
+          <div className="flex-1 flex items-center bg-[#1e1e1e] h-[22px] rounded-[4px] px-2 border border-white/5">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span className="text-[9.5px] text-[#aaa] font-normal ml-1.5 truncate">
+              https://eburon.ai/workspace/{activeWorkspaceResult?.artifact?.title ? activeWorkspaceResult.artifact.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'session'}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-row flex-1 overflow-hidden">
-        
-        {/* Left Sidebar Actions */}
-        <div className="w-[32%] max-w-[200px] p-[14px] border-r border-white/5 bg-[#050709] flex-shrink-0 flex flex-col gap-[10px] overflow-y-auto hidden md:flex">
-          <h3 className="text-[9.5px] tracking-[0.08em] text-[#5e6573] font-bold mb-1 uppercase">Workspace</h3>
-          
-          {activeWorkspaceResult?.artifact && (
-            <>
-              <DownloadButton 
-                content={activeWorkspaceResult.artifact.content}
-                title={activeWorkspaceResult.artifact.title || 'artifact'}
-                type={
-                  activeWorkspaceResult.artifact.type === 'markdown' ? 'text/markdown' : 
-                  activeWorkspaceResult.artifact.type === 'pdf' ? 'application/pdf' : 
-                  activeWorkspaceResult.artifact.type === 'json' ? 'application/json' :
-                  activeWorkspaceResult.artifact.type === 'html' ? 'text/html' :
-                  activeWorkspaceResult.artifact.type === 'image' ? 'image/png' :
-                  activeWorkspaceResult.artifact.type === 'video' ? 'video/mp4' :
-                  'text/plain'
-                }
-                ext={
-                  activeWorkspaceResult.artifact.type === 'markdown' ? 'md' : 
-                  activeWorkspaceResult.artifact.type === 'pdf' ? 'pdf' : 
-                  activeWorkspaceResult.artifact.type === 'json' ? 'json' :
-                  activeWorkspaceResult.artifact.type === 'html' ? 'html' :
-                  activeWorkspaceResult.artifact.type === 'code' ? 'txt' : 
-                  activeWorkspaceResult.artifact.type === 'image' ? 'png' : 
-                  activeWorkspaceResult.artifact.type === 'video' ? 'mp4' : 'text'
-                }
-              />
-              <DownloadDocButton
-                content={activeWorkspaceResult.artifact.content}
-                title={activeWorkspaceResult.artifact.title || 'artifact'}
-                type={activeWorkspaceResult.artifact.type}
-              />
-            </>
-          )}
-
-          <ActionButton icon={Cloud} label="Save to Drive" onClick={() => alert('Saved to Google Drive!')} />
-          <ActionButton icon={Edit3} label="Edit" onClick={() => alert('Edit mode activated')} />
-          <ActionButton icon={Share} label="Share" onClick={() => alert('Share link copied!')} />
-        </div>
-
-        {/* Right Artifact View */}
-        <div className="flex-1 bg-[#080b0f] p-[10px] relative overflow-y-auto w-full flex justify-center items-stretch h-full">
-          {isGenerating ? (
-            <div className="flex items-center justify-center h-full w-full bg-[#111111] text-[#888] rounded">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-8 h-8 border-2 border-t-[#cbfb45] border-[#333] rounded-full animate-spin" />
-                <p className="text-xs font-mono tracking-widest text-[#666] uppercase animate-pulse">Generating Artifact...</p>
-              </div>
+      {/* Desktop Viewport — content area */}
+      <div className="flex-1 overflow-hidden bg-[#f5f5f5] relative">
+        {isGenerating ? (
+          <div className="flex items-center justify-center h-full w-full bg-[#fafafa] text-[#888]">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-8 h-8 border-2 border-t-[#cbfb45] border-[#333] rounded-full animate-spin" />
+              <p className="text-xs font-mono tracking-widest text-[#666] uppercase animate-pulse">Generating Document...</p>
             </div>
-          ) : activeWorkspaceResult?.artifact ? (
-            <div className="w-full text-black bg-white rounded shadow-[0_4px_15px_rgba(0,0,0,0.15)] p-4 md:p-6 flex flex-col relative overflow-hidden text-xs">
+          </div>
+        ) : activeWorkspaceResult?.artifact ? (
+          <div className="w-full h-full overflow-y-auto p-3 flex justify-center">
+            <div className="w-full max-w-[680px] bg-white rounded shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex flex-col relative text-xs" style={{ minHeight: '200px' }}>
               
-              {/* Doc Header */}
-              <div className="flex justify-between items-start border-b border-gray-200 pb-2 mb-3 shrink-0 font-sans">
-                <div className="flex items-center gap-1.5">
-                  <svg width="18" height="18" viewBox="0 0 100 100">
+              {/* Document Header */}
+              <div className="flex justify-between items-start border-b border-gray-200 px-5 pt-4 pb-2.5 shrink-0 font-sans">
+                <div className="flex items-center gap-2">
+                  <svg width="20" height="20" viewBox="0 0 100 100">
                     <path d="M50,18 C61,35 77,54 81,66 C85,78 75,88 62,84 C50,80 50,62 50,62 C50,62 50,80 38,84 C25,88 15,78 19,66 C23,54 39,35 50,18 Z" stroke="black" strokeWidth="10" fill="none" strokeLinejoin="round" />
                     <circle cx="50" cy="58" r="20" stroke="black" strokeWidth="7" fill="none" />
                   </svg>
-                  <span className="text-[10px] font-black tracking-wider text-black">EBURON AI</span>
+                  <span className="text-[11px] font-black tracking-wider text-gray-900">EBURON AI</span>
                 </div>
-                <div className="text-right text-[8px] text-gray-500 font-sans">
-                  <div className="font-bold uppercase tracking-wider text-black">
+                <div className="text-right text-[9px] text-gray-400 font-sans">
+                  <div className="font-bold uppercase tracking-wider text-gray-800">
                     {activeWorkspaceResult.artifact.type === 'markdown' ? 'PROPOSAL' : activeWorkspaceResult.artifact.type.toUpperCase()}
                   </div>
                   <div className="mt-0.5">{new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
                 </div>
               </div>
 
-              {/* Document Content View */}
-              <div className="doc-content flex-grow flex flex-col text-black min-h-0 overflow-hidden font-sans">
-                <div className="doc-title text-[14px] md:text-[18px] font-extrabold leading-tight text-gray-950 mb-0.5 shrink-0">
-                  {activeWorkspaceResult.artifact.title || 'Q2 2024 Strategic Partnership Proposal'}
+              {/* Document Content */}
+              <div className="flex-grow px-5 pt-1 pb-3 overflow-y-auto text-gray-800 font-sans">
+                <div className="text-[16px] font-extrabold leading-tight text-gray-950 mb-1">
+                  {activeWorkspaceResult.artifact.title || 'Document'}
                 </div>
-                <div className="doc-subtitle text-[8.5px] font-medium text-gray-500 uppercase tracking-widest mb-2 shrink-0">
-                  Elevating Innovation Together • Session Workspace Delivery
+                <div className="text-[9px] font-medium text-gray-400 uppercase tracking-widest mb-3">
+                  Session Workspace Delivery
                 </div>
-                
-                <div className="doc-divider border-t border-gray-200 mb-2 shrink-0"></div>
+                <div className="border-t border-gray-100 mb-3"></div>
 
-                <div className="flex-1 overflow-y-auto pr-1 text-gray-800 leading-relaxed font-sans text-[11px]">
-                  {activeWorkspaceResult.artifact.type === 'image' && (
-                    <div className="flex items-center justify-center bg-black rounded p-2 h-full min-h-[180px]">
-                      <img src={activeWorkspaceResult.artifact.content} alt={activeWorkspaceResult.artifact.title || 'Image Artifact'} className="max-w-full max-h-[160px] object-contain" />
-                    </div>
-                  )}
-                  {activeWorkspaceResult.artifact.type === 'video' && (
-                    <div className="flex items-center justify-center bg-black rounded p-2 h-full min-h-[180px]">
-                      <video src={activeWorkspaceResult.artifact.content} controls className="max-w-full max-h-[160px] object-contain" />
-                    </div>
-                  )}
-                  {activeWorkspaceResult.artifact.type === 'pdf' && (
-                    <iframe src={activeWorkspaceResult.artifact.content} className="w-full h-full border-0 rounded bg-white min-h-[180px]" title="PDF Preview" />
-                  )}
-                  {activeWorkspaceResult.artifact.type === 'html' && (
-                    <iframe srcDoc={activeWorkspaceResult.artifact.content} className="w-full h-full border-0 rounded bg-white min-h-[180px]" title="HTML Preview" />
-                  )}
-                  {activeWorkspaceResult.artifact.type === 'markdown' && (
-                    <div className="prose prose-xs max-w-none prose-slate text-[11px] px-1 pb-4 leading-normal">
-                      <ReactMarkdown
-                        components={{
-                          h1: ({node, ...props}) => <h1 className="text-[14px] font-black text-gray-900 border-b border-gray-100 pb-1 mt-4 mb-2" {...props}/>,
-                          h2: ({node, ...props}) => <h2 className="text-[12px] font-bold text-gray-800 border-b border-gray-100 pb-0.5 mt-3.5 mb-1.5" {...props}/>,
-                          h3: ({node, ...props}) => <h3 className="text-[11px] font-bold text-gray-700 mt-3 mb-1" {...props}/>,
-                          p: ({node, ...props}) => <p className="text-[11px] text-gray-700 mb-2.5 leading-relaxed" {...props}/>,
-                          ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props}/>,
-                          ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props}/>,
-                          li: ({node, ...props}) => <li className="text-[11px] text-gray-700 leading-relaxed" {...props}/>,
-                          strong: ({node, ...props}) => <strong className="font-bold text-gray-950" {...props}/>,
-                          em: ({node, ...props}) => <em className="italic text-gray-900" {...props}/>,
-                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#cef158] pl-3 py-1 italic my-3 text-gray-600 bg-gray-50/50 rounded-r text-[11px] leading-relaxed" {...props}/>,
-                          code: ({node, className, children, ...props}: any) => {
-                            const inline = !className || !className.includes('language-');
-                            return inline ? (
-                              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono text-purple-600 font-medium" {...props}>{children}</code>
-                            ) : (
-                              <pre className="bg-gray-900 text-[#ececec] p-3 rounded-lg my-3 overflow-auto font-mono text-[10px] border border-white/5"><code className={className} {...props}>{children}</code></pre>
-                            )
-                          },
-                        }}
-                      >
-                        {activeWorkspaceResult.artifact.content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                  {(activeWorkspaceResult.artifact.type === 'structured' || activeWorkspaceResult.artifact.type === 'json') && (
-                    <div className="p-3 bg-gray-50/50 border border-gray-100 rounded-xl overflow-y-auto w-full min-h-[180px]">
-                      {(() => {
-                        const content = activeWorkspaceResult.artifact.content;
-                        let jsonStr = '';
-                        if (typeof content === 'string') {
-                          try {
-                            jsonStr = JSON.stringify(JSON.parse(content), null, 2);
-                          } catch (e) {
-                            jsonStr = content;
-                          }
-                        } else {
-                          jsonStr = JSON.stringify(content, null, 2);
-                        }
-                        return highlightJson(jsonStr);
-                      })()}
-                    </div>
-                  )}
-                  {activeWorkspaceResult.artifact.type === 'code' && (
-                    <div className="p-3 bg-gray-50/50 border border-gray-100 rounded-xl overflow-y-auto w-full min-h-[180px]">
-                      {highlightCode(activeWorkspaceResult.artifact.content)}
-                    </div>
-                  )}
-                </div>
+                {activeWorkspaceResult.artifact.type === 'image' && (
+                  <div className="flex items-center justify-center bg-gray-50 rounded-lg p-4 min-h-[180px]">
+                    <img src={activeWorkspaceResult.artifact.content} alt={activeWorkspaceResult.artifact.title || 'Image'} className="max-w-full max-h-[240px] object-contain rounded" />
+                  </div>
+                )}
+                {activeWorkspaceResult.artifact.type === 'video' && (
+                  <div className="flex items-center justify-center bg-gray-900 rounded-lg p-4 min-h-[180px]">
+                    <video src={activeWorkspaceResult.artifact.content} controls className="max-w-full max-h-[240px] object-contain rounded" />
+                  </div>
+                )}
+                {activeWorkspaceResult.artifact.type === 'pdf' && (
+                  <iframe src={activeWorkspaceResult.artifact.content} className="w-full border-0 rounded bg-white" title="PDF" style={{ minHeight: '280px', height: '60vh' }} />
+                )}
+                {activeWorkspaceResult.artifact.type === 'html' && (
+                  <iframe srcDoc={activeWorkspaceResult.artifact.content} className="w-full border-0 rounded bg-white" title="HTML" style={{ minHeight: '280px', height: '60vh' }} />
+                )}
+                {activeWorkspaceResult.artifact.type === 'markdown' && (
+                  <div className="prose prose-sm max-w-none prose-slate text-[12px] leading-relaxed">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({node, ...props}) => <h1 className="text-[18px] font-black text-gray-900 border-b border-gray-100 pb-2 mt-6 mb-3" {...props}/>,
+                        h2: ({node, ...props}) => <h2 className="text-[15px] font-bold text-gray-800 border-b border-gray-100 pb-1 mt-5 mb-2" {...props}/>,
+                        h3: ({node, ...props}) => <h3 className="text-[13px] font-bold text-gray-700 mt-4 mb-1.5" {...props}/>,
+                        p: ({node, ...props}) => <p className="text-[12px] text-gray-700 mb-3 leading-relaxed" {...props}/>,
+                        ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1.5" {...props}/>,
+                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1.5" {...props}/>,
+                        li: ({node, ...props}) => <li className="text-[12px] text-gray-700 leading-relaxed" {...props}/>,
+                        strong: ({node, ...props}) => <strong className="font-bold text-gray-950" {...props}/>,
+                        em: ({node, ...props}) => <em className="italic text-gray-900" {...props}/>,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#cbfb45] pl-4 py-2 italic my-4 text-gray-600 bg-gray-50 rounded-r text-[12px] leading-relaxed" {...props}/>,
+                        code: ({node, className, children, ...props}: any) => {
+                          const inline = !className || !className.includes('language-');
+                          return inline ? (
+                            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] font-mono text-purple-600 font-medium" {...props}>{children}</code>
+                          ) : (
+                            <pre className="bg-gray-900 text-[#ececec] p-4 rounded-lg my-4 overflow-auto font-mono text-[11px] border border-gray-700"><code className={className} {...props}>{children}</code></pre>
+                          )
+                        },
+                        table: ({node, ...props}) => <table className="w-full border-collapse border border-gray-200 text-[12px] my-3" {...props}/>,
+                        th: ({node, ...props}) => <th className="border border-gray-200 bg-gray-50 px-3 py-2 text-left font-bold text-gray-800" {...props}/>,
+                        td: ({node, ...props}) => <td className="border border-gray-200 px-3 py-2 text-gray-700" {...props}/>,
+                      }}
+                    >
+                      {activeWorkspaceResult.artifact.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                {(activeWorkspaceResult.artifact.type === 'structured' || activeWorkspaceResult.artifact.type === 'json') && (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-auto w-full min-h-[200px]">
+                    {(() => {
+                      const content = activeWorkspaceResult.artifact.content;
+                      let jsonStr = '';
+                      if (typeof content === 'string') {
+                        try { jsonStr = JSON.stringify(JSON.parse(content), null, 2); } catch(e) { jsonStr = content; }
+                      } else { jsonStr = JSON.stringify(content, null, 2); }
+                      return highlightJson(jsonStr);
+                    })()}
+                  </div>
+                )}
+                {activeWorkspaceResult.artifact.type === 'code' && (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-auto w-full min-h-[200px]">
+                    {highlightCode(activeWorkspaceResult.artifact.content)}
+                  </div>
+                )}
               </div>
 
-              {/* Doc Footer Accent Signature */}
-              <div className="doc-footer-line border-t-[1.5px] border-[#cef158] mt-3 pt-2 shrink-0 font-sans">
-                <div className="flex justify-between items-center text-[8.5px] font-bold text-black uppercase">
-                  <span>Eburon AI</span>
-                  <span>Page 1 of 1</span>
-                </div>
+              {/* Document Footer */}
+              <div className="border-t border-gray-200 px-5 py-2 shrink-0 font-sans flex justify-between items-center">
+                <span className="text-[9px] font-bold text-gray-400 uppercase">Eburon AI</span>
+                <span className="text-[9px] font-bold text-gray-400">Page 1 of 1</span>
               </div>
-
             </div>
-          ) : activeWorkspaceResult ? (
-            <div className="w-full flex justify-center items-center h-full overflow-hidden p-2">
+          </div>
+        ) : activeWorkspaceResult ? (
+          <div className="w-full h-full overflow-y-auto p-3 flex justify-center items-start">
+            <div className="w-full max-w-[680px]">
               <WorkspaceDataViewer data={activeWorkspaceResult} />
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+      </div>
 
+      {/* Bottom Action Bar */}
+      {activeWorkspaceResult?.artifact && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-[#2d2d2d] border-t border-white/5 shrink-0">
+          <DownloadButton 
+            content={activeWorkspaceResult.artifact.content}
+            title={activeWorkspaceResult.artifact.title || 'document'}
+            type={
+              activeWorkspaceResult.artifact.type === 'markdown' ? 'text/markdown' : 
+              activeWorkspaceResult.artifact.type === 'pdf' ? 'application/pdf' : 
+              activeWorkspaceResult.artifact.type === 'json' ? 'application/json' :
+              activeWorkspaceResult.artifact.type === 'html' ? 'text/html' :
+              activeWorkspaceResult.artifact.type === 'image' ? 'image/png' :
+              activeWorkspaceResult.artifact.type === 'video' ? 'video/mp4' :
+              'text/plain'
+            }
+            ext={
+              activeWorkspaceResult.artifact.type === 'markdown' ? 'md' : 
+              activeWorkspaceResult.artifact.type === 'pdf' ? 'pdf' : 
+              activeWorkspaceResult.artifact.type === 'json' ? 'json' :
+              activeWorkspaceResult.artifact.type === 'html' ? 'html' :
+              activeWorkspaceResult.artifact.type === 'code' ? 'txt' : 
+              activeWorkspaceResult.artifact.type === 'image' ? 'png' : 
+              activeWorkspaceResult.artifact.type === 'video' ? 'mp4' : 'text'
+            }
+          />
+          <DownloadDocButton
+            content={activeWorkspaceResult.artifact.content}
+            title={activeWorkspaceResult.artifact.title || 'document'}
+            type={activeWorkspaceResult.artifact.type}
+          />
+          <button onClick={() => alert('Saved to Google Drive!')} className="flex items-center gap-1.5 bg-[#1e1e1e] border border-white/5 hover:bg-[#333] transition-colors text-white text-[10px] font-medium rounded-[6px] h-[30px] px-2.5 shrink-0 cursor-pointer">
+            <Cloud size={12} /> Save
+          </button>
+          <button onClick={() => alert('Share link copied!')} className="flex items-center gap-1.5 bg-[#1e1e1e] border border-white/5 hover:bg-[#333] transition-colors text-white text-[10px] font-medium rounded-[6px] h-[30px] px-2.5 shrink-0 cursor-pointer">
+            <Share size={12} /> Share
+          </button>
+        </div>
+      )}
+        </div>
       </div>
     </motion.div>
   );

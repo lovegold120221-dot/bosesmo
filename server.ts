@@ -297,8 +297,7 @@ async function startServer() {
         whatsappConnected,
         whatsappPhone,
         whatsappDisplayName,
-        configured: !!accessToken && !!phoneNumberId,
-        instructions: "To finalize production activation: 1. Create your Business application on developers.facebook.com. 2. Enable physical WhatsApp Product. 3. Retrieve your permanent access token and Phone Number ID, setting them securely in your .env or Environment Variables. 4. Complete the official phone linking."
+        configured: !!accessToken && !!phoneNumberId
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -306,24 +305,35 @@ async function startServer() {
   });
 
   app.post('/api/whatsapp/pair', authenticateToken, async (req: any, res) => {
-    const { phone, displayName, phoneId, businessAccountId, accessToken } = req.body;
+    const { phone, displayName } = req.body;
     try {
       const firestore = getFirestoreDb();
+      const finalPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const finalBusinessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const finalAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+      if (!finalPhoneId || !finalAccessToken) {
+        return res.status(500).json({
+          error: 'Server WhatsApp credentials not configured',
+          message: 'WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN must be set in .env'
+        });
+      }
+
       await firestore.collection('users').doc(req.user.uid).set({
         whatsappConnected: true,
-        whatsappPhone: phone || '+1 (555) 019-2831',
-        whatsappDisplayName: displayName || 'Eburon Workspace Client',
-        whatsappPhoneId: phoneId || null,
-        whatsappBusinessAccountId: businessAccountId || null,
-        whatsappAccessToken: accessToken || null,
+        whatsappPhone: phone || null,
+        whatsappDisplayName: displayName || null,
+        whatsappPhoneId: finalPhoneId,
+        whatsappBusinessAccountId: finalBusinessAccountId,
+        whatsappAccessToken: finalAccessToken,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
       res.json({
         success: true,
         whatsappConnected: true,
-        whatsappPhone: phone || '+1 (555) 019-2831',
-        whatsappDisplayName: displayName || 'Eburon Workspace Client'
+        whatsappPhone: phone || null,
+        whatsappDisplayName: displayName || null
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

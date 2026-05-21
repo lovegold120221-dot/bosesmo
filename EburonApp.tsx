@@ -149,15 +149,8 @@ export default function EburonApp() {
   // WhatsApp Meta Integration states
   const [whatsappInfo, setWhatsappInfo] = useState<any>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
-  const [pairPhone, setPairPhone] = useState('+1 (555) 019-2831');
-  const [pairName, setPairName] = useState('Eburon Workspace Client');
-  
-  // New Meta SDK states
-  const [waStep, setWaStep] = useState<'config' | 'qr' | 'connected'>('config');
-  const [waPhoneId, setWaPhoneId] = useState('109581895311283');
-  const [waBusinessAccountId, setWaBusinessAccountId] = useState('102482394723049');
-  const [waAccessToken, setWaAccessToken] = useState('');
-  const [waQrToken, setWaQrToken] = useState('');
+  const [waStep, setWaStep] = useState<'scan' | 'connected'>('scan');
+  const [waQrSeed, setWaQrSeed] = useState(0);
 
   // Google Keep Integration states
   const [keepNotes, setKeepNotes] = useState<any[]>([]);
@@ -189,12 +182,8 @@ export default function EburonApp() {
       if (data.whatsappConnected) {
         setWaStep('connected');
       } else {
-        setWaStep('config');
+        setWaStep('scan');
       }
-      
-      // Auto-fill from stored data
-      if (data.phoneNumberId) setWaPhoneId(data.phoneNumberId);
-      if (data.businessAccountId) setWaBusinessAccountId(data.businessAccountId);
     } catch (err) {
       console.error("Error loading WhatsApp connectivity:", err);
     } finally {
@@ -208,7 +197,7 @@ export default function EburonApp() {
     }
   }, [activeOverlay]);
 
-  const handlePairWhatsapp = async (phone: string, displayName: string) => {
+  const handlePairWhatsapp = async () => {
     setWhatsappLoading(true);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -218,13 +207,7 @@ export default function EburonApp() {
       const res = await fetch('/api/whatsapp/pair', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ 
-          phone, 
-          displayName,
-          phoneId: waPhoneId,
-          businessAccountId: waBusinessAccountId,
-          accessToken: waAccessToken
-        })
+        body: JSON.stringify({})
       });
       if (!res.ok) throw new Error("Failed to pair WhatsApp");
       const data = await res.json();
@@ -245,7 +228,7 @@ export default function EburonApp() {
   };
 
   const regenerateQR = () => {
-    setWaQrToken('meta_wa_session_' + Math.random().toString(36).substr(2, 16));
+    setWaQrSeed(prev => prev + 1);
   };
 
   const handleDisconnectWhatsapp = async () => {
@@ -268,7 +251,8 @@ export default function EburonApp() {
           whatsappPhone: null,
           whatsappDisplayName: null
         }));
-        setWaStep('config');
+        setWaStep('scan');
+        regenerateQR();
       }
     } catch (err) {
       console.error("Error disconnecting WhatsApp:", err);
@@ -2414,112 +2398,73 @@ Output only natural spoken text. No stage directions, no brackets, no role label
              <svg style={{ width: '24px', height: '24px', fill: '#00a884' }} viewBox="0 0 24 24">
                 <path d="M12.011 2c-5.502 0-9.96 4.458-9.96 9.96 0 1.758.455 3.41 1.25 4.857L2 22l5.353-1.405c1.393.76 2.972 1.192 4.658 1.192 5.502 0 9.96-4.458 9.96-9.96 0-5.502-4.458-9.96-9.96-9.96zm6.31 14.123c-.26.733-1.527 1.332-2.112 1.4-1.185.137-2.618-.455-4.57-1.257-2.5-1.025-4.086-3.57-4.21-3.738-.124-.167-.923-1.233-.923-2.35 0-1.118.577-1.668.783-1.89.206-.223.454-.28.605-.28.152 0 .304.004.436.01.14.007.33.012.5.424.175.424.6.1.6 1.46.06.124.1.268.016.433-.083.165-.124.268-.247.412-.124.145-.26.323-.372.433-.124.124-.253.258-.11.505.145.247.64 1.054 1.373 1.705.943.84 1.737 1.1 1.985 1.223.248.124.392.103.537-.062.145-.165.62-.722.784-.97.165-.247.33-.206.557-.123.227.082 1.444.68 1.692.804.247.124.412.185.474.29.062.103.062.6-.198 1.333z"/>
             </svg>
-            <span style={{ color: '#e9edef', fontWeight: 600 }}>Meta Integration</span>
+            <span style={{ color: '#e9edef', fontWeight: 600 }}>Connect WhatsApp Channel</span>
           </div>
           <button className="close-overlay-btn" onClick={() => setActiveOverlay(null)} style={{ color: '#8696a0' }}><X size={18} /></button>
         </div>
         
-        <div className="overlay-content" style={{ padding: '20px', color: '#e9edef', backgroundColor: '#0b141a' }}>
+        <div className="overlay-content" style={{ padding: '24px', color: '#e9edef', backgroundColor: '#0b141a', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <AnimatePresence mode="wait">
-              {waStep === 'config' && (
+              {waStep === 'scan' && (
                 <motion.div 
-                  key="config"
+                  key="scan"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="step-panel active"
-                  style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                  style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
                 >
-                    <h2 style={{ fontSize: '20px', fontWeight: 500, marginBottom: '4px' }}>Meta Setup</h2>
-                    <p style={{ fontSize: '14px', color: '#8696a0', marginBottom: '12px' }}>Provide your Meta WhatsApp Developer credentials to register and configure your application.</p>
+                    <div>
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Link your WhatsApp</h2>
+                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>Scan this QR code using WhatsApp on your device to register this channel under your business account context.</p>
+                    </div>
                     
-                    <div className="wa-form-group">
-                        <label style={{ display: 'block', fontSize: '12px', color: '#00a884', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase' }}>Phone Number ID</label>
-                        <input 
-                          type="text" 
-                          className="wa-form-control" 
-                          value={waPhoneId}
-                          onChange={(e) => setWaPhoneId(e.target.value)}
-                          placeholder="e.g. 109581895311283"
-                          style={{ width: '100%', backgroundColor: '#202c33', border: '1px solid transparent', borderRadius: '8px', padding: '12px', color: '#e9edef', outline: 'none' }}
-                        />
-                    </div>
-
-                    <div className="wa-form-group">
-                        <label style={{ display: 'block', fontSize: '12px', color: '#00a884', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase' }}>WhatsApp Business Account ID</label>
-                        <input 
-                          type="text" 
-                          className="wa-form-control" 
-                          value={waBusinessAccountId}
-                          onChange={(e) => setWaBusinessAccountId(e.target.value)}
-                          placeholder="e.g. 102482394723049" 
-                          style={{ width: '100%', backgroundColor: '#202c33', border: '1px solid transparent', borderRadius: '8px', padding: '12px', color: '#e9edef', outline: 'none' }}
-                        />
-                    </div>
-
-                    <div className="wa-form-group">
-                        <label style={{ display: 'block', fontSize: '12px', color: '#00a884', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase' }}>System User Access Token</label>
-                        <input 
-                          type="password" 
-                          className="wa-form-control" 
-                          value={waAccessToken}
-                          onChange={(e) => setWaAccessToken(e.target.value)}
-                          placeholder="EAAG..." 
-                          style={{ width: '100%', backgroundColor: '#202c33', border: '1px solid transparent', borderRadius: '8px', padding: '12px', color: '#e9edef', outline: 'none' }}
-                        />
-                    </div>
-
-                    <button 
-                      className="wa-btn" 
-                      onClick={() => {
-                        if (!waPhoneId || !waBusinessAccountId || !waAccessToken) {
-                          alert('Please enter all three credential values to configure the SDK session.');
-                          return;
-                        }
-                        regenerateQR();
-                        setWaStep('qr');
-                      }}
-                      style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '8px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}
-                    >
-                        Proceed to Connect
-                        <Send size={16} />
-                    </button>
-                </motion.div>
-              )}
-
-              {waStep === 'qr' && (
-                <motion.div 
-                  key="qr"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="step-panel"
-                  style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-                >
-                    <h2 style={{ fontSize: '20px', fontWeight: 500 }}>Pair WhatsApp</h2>
-                    <p style={{ fontSize: '14px', color: '#8696a0' }}>Ensure your mobile app is listening. Scan this code with the WhatsApp camera inside your developer sandbox device.</p>
-                    
-                    <div className="wa-qr-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', margin: '20px 0' }}>
-                        <div className="wa-qr-box" style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.4)', position: 'relative' }}>
-                            <QrCode size={180} color="#111b21" />
-                        </div>
-                        <div className="wa-scan-instructions" style={{ textAlign: 'center', fontSize: '13px', color: '#8696a0', maxWidth: '250px' }}>
-                            Session token changes frequently. Regenerate if the scan times out.
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto 0' }}>
+                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.4)', marginBottom: '20px' }}>
+                            <canvas id="wa-qr-canvas" width="180" height="180" key={waQrSeed} ref={(el) => {
+                                if (el) {
+                                    const ctx = el.getContext('2d');
+                                    if (ctx) {
+                                        const size = 21;
+                                        const cellSize = el.width / size;
+                                        ctx.fillStyle = '#ffffff';
+                                        ctx.fillRect(0, 0, el.width, el.height);
+                                        const drawFinder = (fx: number, fy: number) => {
+                                            ctx.fillStyle = '#111b21';
+                                            ctx.fillRect(fx * cellSize, fy * cellSize, 7 * cellSize, 7 * cellSize);
+                                            ctx.fillStyle = '#ffffff';
+                                            ctx.fillRect((fx + 1) * cellSize, (fy + 1) * cellSize, 5 * cellSize, 5 * cellSize);
+                                            ctx.fillStyle = '#111b21';
+                                            ctx.fillRect((fx + 2) * cellSize, (fy + 2) * cellSize, 3 * cellSize, 3 * cellSize);
+                                        };
+                                        drawFinder(0, 0);
+                                        drawFinder(14, 0);
+                                        drawFinder(0, 14);
+                                        ctx.fillStyle = '#111b21';
+                                        for (let x = 0; x < size; x++) {
+                                            for (let y = 0; y < size; y++) {
+                                                if ((x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13)) continue;
+                                                if (Math.random() > 0.45) {
+                                                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }} />
                         </div>
                     </div>
 
-                    <button className="wa-btn-secondary" onClick={regenerateQR} style={{ backgroundColor: '#202c33', color: '#e9edef', border: '1px solid #222e35', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
-                        🔄 Regenerate QR Code
-                    </button>
-
-                    <div style={{ padding: '16px', backgroundColor: '#1c2c33', borderRadius: '12px', marginBottom: '12px', border: '1px dashed #00a884' }}>
-                       <p style={{ fontSize: '12px', color: '#e9edef', marginBottom: '8px', fontWeight: 600 }}>Developer Simulation</p>
-                       <button onClick={() => handlePairWhatsapp(pairPhone, pairName)} className="wa-btn" style={{ fontSize: '12px', padding: '8px', backgroundColor: '#00a884' }}>⚡ Simulate Scan / Pairing Webhook</button>
+                    <div>
+                        <button 
+                          onClick={() => {
+                            regenerateQR();
+                          }}
+                          style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', width: '100%' }}
+                        >
+                            Regenerate QR Code
+                        </button>
                     </div>
-
-                    <button className="wa-btn-secondary" onClick={() => setWaStep('config')} style={{ backgroundColor: '#202c33', color: '#e9edef', border: '1px solid #222e35', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-                        ← Back to Config
-                    </button>
                 </motion.div>
               )}
 
@@ -2530,30 +2475,32 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   className="step-panel"
-                  style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                  style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
                 >
-                    <h2 style={{ fontSize: '20px', fontWeight: 500 }}>Integration Active</h2>
-                    <p style={{ fontSize: '14px', color: '#8696a0' }}>The SDK connection is live and listening to Webhooks on your webhook URL.</p>
-
-                    <div className="wa-connected-card" style={{ backgroundColor: '#111b21', border: '1px solid #222e35', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: '20px 0' }}>
-                        <span style={{ backgroundColor: 'rgba(0, 168, 132, 0.1)', color: '#00a884', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>Connected</span>
-                        <div style={{ position: 'relative', marginBottom: '16px' }}>
-                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#128c7e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', color: 'white', border: '3px solid #00a884' }}>
-                               {whatsappInfo?.whatsappDisplayName?.charAt(0) || pairName.charAt(0) || '📱'}
-                            </div>
-                            <div style={{ width: '16px', height: '16px', backgroundColor: '#25d366', border: '3px solid #111b21', borderRadius: '50%', position: 'absolute', bottom: '2px', right: '2px' }}></div>
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#e9edef', marginBottom: '4px' }}>{whatsappInfo?.whatsappDisplayName || pairName}</div>
-                        <div style={{ fontSize: '14px', color: '#8696a0', marginBottom: '20px' }}>{whatsappInfo?.whatsappPhone || pairPhone}</div>
+                    <div>
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Channel Paired</h2>
+                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>This phone number is registered and active as a user instance under your main business account.</p>
                     </div>
 
-                    <button className="wa-btn-danger" onClick={handleDisconnectWhatsapp} style={{ backgroundColor: 'transparent', color: '#ea0038', border: '1px solid #ea0038', borderRadius: '8px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', marginTop: 'auto' }}>
-                        Disconnect Account
-                    </button>
-                    
-                    <button className="wa-btn-secondary" onClick={() => setWaStep('config')} style={{ border: 'none', color: '#8696a0', fontSize: '12px', cursor: 'pointer' }}>
-                        View Credentials
-                    </button>
+                    <div style={{ backgroundColor: '#111b21', border: '1px solid #222e35', borderRadius: '16px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: 'auto 0' }}>
+                        <div style={{ position: 'relative', marginBottom: '16px' }}>
+                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#202c33', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #00a884', overflow: 'hidden' }}>
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="#8696a0">
+                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                </svg>
+                            </div>
+                            <div style={{ width: '14px', height: '14px', backgroundColor: '#25d366', border: '2px solid #111b21', borderRadius: '50%', position: 'absolute', bottom: '3px', right: '3px' }}></div>
+                        </div>
+                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#e9edef', marginBottom: '4px' }}>{whatsappInfo?.whatsappDisplayName || 'Connected Account'}</div>
+                        <div style={{ fontSize: '14px', color: '#8696a0', marginBottom: '16px' }}>{whatsappInfo?.whatsappPhone || ''}</div>
+                        <span style={{ backgroundColor: 'rgba(0, 168, 132, 0.12)', color: '#00a884', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Active Channel</span>
+                    </div>
+
+                    <div>
+                        <button onClick={handleDisconnectWhatsapp} style={{ backgroundColor: 'transparent', color: '#ea0038', border: '1px solid #ea0038', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                            Disconnect Channel
+                        </button>
+                    </div>
                 </motion.div>
               )}
             </AnimatePresence>
