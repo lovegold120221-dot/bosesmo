@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile data, credentials, and settings",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "photoURL": {
+          "type": "string"
+        },
+        "accessToken": {
+          "type": "string"
+        },
+        "settings": {
+          "type": "object",
+          "description": "User configuration settings from overlay",
+          "properties": {
+            "personaName": { "type": "string" },
+            "userCallName": { "type": "string" },
+            "systemPrompt": { "type": "string" },
+            "voice": { "type": "string" },
+            "language": { "type": "string" },
+            "tools": { "type": "array" }
+          }
+        },
+        "memories": {
+          "type": "array",
+          "description": "List of memories for the user"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Note": {
+      "title": "User Note",
+      "description": "A personal note saved by the user",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "createdAt", "updatedAt"]
+    },
+    "WhatsAppMessage": {
+      "title": "WhatsApp Message",
+      "description": "Log of a sent or received WhatsApp message",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string" },
+        "text": { "type": "string" },
+        "direction": { "type": "string", "enum": ["sent", "received"] },
+        "status": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "text", "direction", "timestamp"]
+    },
+    "ConversationTurn": {
+      "title": "Conversation Turn",
+      "description": "A single spoken turn in a conversation.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "text": { "type": "string" },
+        "isFinal": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "text", "isFinal", "timestamp"]
+    },
+    "MemoryItem": {
+      "title": "Memory Item",
+      "description": "A distinct captured context or preference key-value.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "type", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user document containing private memories"
+    },
+    "/users/{userId}/conversations/{turnId}": {
+      "schema": "ConversationTurn",
+      "description": "A separate subcollection storing conversation history turns as individual real documents"
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": "MemoryItem",
+      "description": "A separate subcollection storing long-term context memories as individual real database items"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Collection of personal notes for the user"
+    },
+    "/users/{userId}/whatsapp_messages/{messageId}": {
+      "schema": "WhatsAppMessage",
+      "description": "History of WhatsApp communications"
+    }
+  }
+}

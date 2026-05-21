@@ -1,0 +1,11 @@
+{
+  "name": "mastervoice",
+  "description": "Beatrice: An interactive AI persona with Shared Sight, memory, and artifact generation.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
