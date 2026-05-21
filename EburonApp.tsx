@@ -20,9 +20,8 @@ import {
   FileStack, Paperclip, Send, Mic, Cast, X, Check, Save, RotateCcw,
   Plug, Lock, Pencil, Maximize2, Plus, Cpu, CheckSquare, Square,
   Monitor, Eye, Camera, FileImage, Fullscreen, ChevronDown, ChevronUp,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, Globe
 } from 'lucide-react';
-import { ArtifactOverlay } from './components/ArtifactOverlay';
 import Sidebar from './components/Sidebar';
 import ToolEditorModal from './components/ToolEditorModal';
 
@@ -150,7 +149,8 @@ export default function EburonApp() {
   const [whatsappInfo, setWhatsappInfo] = useState<any>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [waStep, setWaStep] = useState<'scan' | 'connected'>('scan');
-  const [waQrSeed, setWaQrSeed] = useState(0);
+  const [qrImageUrl, setQrImageUrl] = useState<string>('');
+  const [qrLoading, setQrLoading] = useState(false);
 
   // Google Keep Integration states
   const [keepNotes, setKeepNotes] = useState<any[]>([]);
@@ -183,11 +183,55 @@ export default function EburonApp() {
         setWaStep('connected');
       } else {
         setWaStep('scan');
+        fetchQRCode();
       }
     } catch (err) {
       console.error("Error loading WhatsApp connectivity:", err);
     } finally {
       setWhatsappLoading(false);
+    }
+  };
+
+  const fetchQRCode = async () => {
+    setQrLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const res = await fetch('/api/whatsapp/qr', { headers });
+      if (!res.ok) throw new Error("Failed to fetch QR code");
+      const data = await res.json();
+      if (data.success && data.qrCode) {
+        setQrImageUrl(data.qrCode.qr_image_url || '');
+      }
+    } catch (err) {
+      console.error("Error fetching QR code:", err);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const regenerateQRCode = async () => {
+    setQrLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const res = await fetch('/api/whatsapp/qr/regenerate', {
+        method: 'POST',
+        headers
+      });
+      if (!res.ok) throw new Error("Failed to regenerate QR code");
+      const data = await res.json();
+      if (data.success && data.qrCode) {
+        setQrImageUrl(data.qrCode.qr_image_url || '');
+      }
+    } catch (err) {
+      console.error("Error regenerating QR code:", err);
+    } finally {
+      setQrLoading(false);
     }
   };
 
@@ -209,26 +253,27 @@ export default function EburonApp() {
         headers,
         body: JSON.stringify({})
       });
-      if (!res.ok) throw new Error("Failed to pair WhatsApp");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to pair WhatsApp");
+      }
       const data = await res.json();
       if (data.success) {
-        setWhatsappInfo((prev: any) => ({
-          ...prev,
+        setWhatsappInfo({
           whatsappConnected: true,
           whatsappPhone: data.whatsappPhone,
-          whatsappDisplayName: data.whatsappDisplayName
-        }));
+          whatsappDisplayName: data.whatsappDisplayName,
+          phoneRegistered: data.phoneRegistered,
+          webhookSubscribed: data.webhookSubscribed
+        });
         setWaStep('connected');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error pairing WhatsApp:", err);
+      alert(err.message || 'Failed to connect WhatsApp.');
     } finally {
       setWhatsappLoading(false);
     }
-  };
-
-  const regenerateQR = () => {
-    setWaQrSeed(prev => prev + 1);
   };
 
   const handleDisconnectWhatsapp = async () => {
@@ -1224,11 +1269,154 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         </div>
       </div>
 
+      {/* WebView - Desktop Browser Preview */}
       <AnimatePresence>
         {(isGenerating || activeWorkspaceResult) && (
-          <div className="w-full max-w-4xl mx-auto flex-shrink-0 z-10 px-2 lg:px-0">
-            <ArtifactOverlay />
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-4xl mx-auto flex-shrink-0 px-2 lg:px-0"
+            style={{ zIndex: 10 }}
+          >
+            <div style={{
+              backgroundColor: '#0d0f12',
+              borderRadius: '16px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              overflow: 'hidden',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.4)'
+            }}>
+              {/* Browser Chrome */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                backgroundColor: '#16181c',
+                borderBottom: '1px solid rgba(255,255,255,0.06)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {/* Traffic Lights */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ff5f57' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#febc2e' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#28c840' }} />
+                  </div>
+                  {/* Title Text */}
+                  <span style={{ fontSize: '11px', color: '#aaa', fontWeight: 500, letterSpacing: '0.3px' }}>
+                    eburonhub workstation
+                  </span>
+                </div>
+                {/* Close Button */}
+                <button
+                  onClick={() => { setActiveWorkspaceResult(null); setIsGenerating(false); }}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* 16:9 Content Area */}
+              <div style={{
+                padding: '12px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: '200px',
+                backgroundColor: '#0a0c10'
+              }}>
+                <div style={{
+                  width: '100%',
+                  maxWidth: '680px',
+                  aspectRatio: '16/9',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {/* Scaled Content - centered */}
+                  <div style={{
+                    width: '143%',
+                    height: '143%',
+                    transform: 'scale(0.7)',
+                    transformOrigin: 'center center',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    marginLeft: '-71.5%',
+                    marginTop: '-71.5%',
+                    overflow: 'hidden'
+                  }}>
+                    {isGenerating ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', backgroundColor: '#fafafa', width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '24px', height: '24px', border: '2px solid #e5e7eb', borderTopColor: '#00a884', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                          <span style={{ fontSize: '11px', color: '#888', fontFamily: 'monospace', letterSpacing: '0.5px' }}>GENERATING...</span>
+                        </div>
+                      </div>
+                    ) : activeWorkspaceResult?.artifact ? (
+                      activeWorkspaceResult.artifact.type === 'html' ? (
+                        <iframe
+                          srcDoc={activeWorkspaceResult.artifact.content}
+                          style={{ width: '100%', height: '100%', border: 'none' }}
+                          title="Document Preview"
+                        />
+                      ) : activeWorkspaceResult.artifact.type === 'markdown' ? (
+                        <div style={{ padding: '24px', fontFamily: '-apple-system, sans-serif', fontSize: '14px', color: '#1a1a1a', overflow: 'auto', height: '100%', width: '100%' }}>
+                          <ReactMarkdown
+                            components={{
+                              h1: ({node, ...props}) => <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '12px', borderBottom: '2px solid #eee', paddingBottom: '6px' }} {...props}/>,
+                              h2: ({node, ...props}) => <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '10px' }} {...props}/>,
+                              p: ({node, ...props}) => <p style={{ fontSize: '14px', lineHeight: 1.7, marginBottom: '12px', color: '#333' }} {...props}/>,
+                              ul: ({node, ...props}) => <ul style={{ paddingLeft: '20px', marginBottom: '12px' }} {...props}/>,
+                              li: ({node, ...props}) => <li style={{ fontSize: '14px', marginBottom: '4px' }} {...props}/>,
+                              strong: ({node, ...props}) => <strong style={{ fontWeight: 700 }} {...props}/>,
+                              code: ({node, className, children, ...props}: any) => {
+                                const inline = !className || !className.includes('language-');
+                                return inline ? (
+                                  <code style={{ backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace' }} {...props}>{children}</code>
+                                ) : (
+                                  <pre style={{ backgroundColor: '#1e1e1e', color: '#e5e7eb', padding: '12px', borderRadius: '6px', fontSize: '12px', fontFamily: 'monospace', overflow: 'auto' }}><code className={className} {...props}>{children}</code></pre>
+                                )
+                              },
+                            }}
+                          >
+                            {activeWorkspaceResult.artifact.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : activeWorkspaceResult.artifact.type === 'image' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', backgroundColor: '#f5f5f5', width: '100%' }}>
+                          <img src={activeWorkspaceResult.artifact.content} alt="" style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
+                        </div>
+                      ) : (
+                        <div style={{ padding: '20px', fontFamily: 'monospace', fontSize: '12px', color: '#333', overflow: 'auto', height: '100%', width: '100%', whiteSpace: 'pre-wrap' }}>
+                          {typeof activeWorkspaceResult.artifact.content === 'string' ? activeWorkspaceResult.artifact.content : JSON.stringify(activeWorkspaceResult.artifact.content, null, 2)}
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2416,53 +2604,42 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                 >
                     <div>
                         <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Link your WhatsApp</h2>
-                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>Scan this QR code using WhatsApp on your device to register this channel under your business account context.</p>
+                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>Scan this QR code using WhatsApp on your device to connect this channel.</p>
                     </div>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto 0' }}>
-                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.4)', marginBottom: '20px' }}>
-                            <canvas id="wa-qr-canvas" width="180" height="180" key={waQrSeed} ref={(el) => {
-                                if (el) {
-                                    const ctx = el.getContext('2d');
-                                    if (ctx) {
-                                        const size = 21;
-                                        const cellSize = el.width / size;
-                                        ctx.fillStyle = '#ffffff';
-                                        ctx.fillRect(0, 0, el.width, el.height);
-                                        const drawFinder = (fx: number, fy: number) => {
-                                            ctx.fillStyle = '#111b21';
-                                            ctx.fillRect(fx * cellSize, fy * cellSize, 7 * cellSize, 7 * cellSize);
-                                            ctx.fillStyle = '#ffffff';
-                                            ctx.fillRect((fx + 1) * cellSize, (fy + 1) * cellSize, 5 * cellSize, 5 * cellSize);
-                                            ctx.fillStyle = '#111b21';
-                                            ctx.fillRect((fx + 2) * cellSize, (fy + 2) * cellSize, 3 * cellSize, 3 * cellSize);
-                                        };
-                                        drawFinder(0, 0);
-                                        drawFinder(14, 0);
-                                        drawFinder(0, 14);
-                                        ctx.fillStyle = '#111b21';
-                                        for (let x = 0; x < size; x++) {
-                                            for (let y = 0; y < size; y++) {
-                                                if ((x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13)) continue;
-                                                if (Math.random() > 0.45) {
-                                                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }} />
+                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.4)', marginBottom: '20px', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {qrLoading ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '24px', height: '24px', border: '2px solid #e5e7eb', borderTopColor: '#00a884', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                                <span style={{ fontSize: '11px', color: '#888' }}>Loading QR...</span>
+                              </div>
+                            ) : qrImageUrl ? (
+                              <img src={qrImageUrl} alt="WhatsApp QR Code" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '20px' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '8px' }}>📱</div>
+                                <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '4px' }}>QR code will appear after connection</span>
+                                <span style={{ fontSize: '11px', color: '#666' }}>Click "I Scanned" to connect using server credentials</span>
+                              </div>
+                            )}
                         </div>
                     </div>
 
-                    <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <button 
-                          onClick={() => {
-                            regenerateQR();
-                          }}
-                          style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', width: '100%' }}
+                          onClick={handlePairWhatsapp}
+                          disabled={whatsappLoading}
+                          style={{ backgroundColor: whatsappLoading ? '#008f72' : '#00a884', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: whatsappLoading ? 'wait' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', width: '100%', opacity: whatsappLoading ? 0.7 : 1 }}
                         >
-                            Regenerate QR Code
+                            {whatsappLoading ? 'Connecting...' : 'I Scanned the QR Code'}
+                        </button>
+                        <button 
+                          onClick={regenerateQRCode}
+                          disabled={qrLoading}
+                          style={{ backgroundColor: '#202c33', color: '#e9edef', border: '1px solid #222e35', borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: 600, cursor: qrLoading ? 'wait' : 'pointer', width: '100%', opacity: qrLoading ? 0.7 : 1 }}
+                        >
+                            {qrLoading ? 'Regenerating...' : 'Regenerate QR Code'}
                         </button>
                     </div>
                 </motion.div>

@@ -273,39 +273,280 @@ async function startServer() {
     }
   });
 
-  // WhatsApp Proxy (Meta for Developers Cloud API)
+  // ==========================================
+  // WhatsApp Multi-User Agentic Integration
+  // ==========================================
+
+  // Helper: resolve WhatsApp credentials for a specific user
+  async function resolveUserWhatsAppCredentials(uid: string) {
+    const firestore = getFirestoreDb();
+    const userDoc = await firestore.collection('users').doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
+    const phoneNumberId = userData?.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || null;
+    const businessAccountId = userData?.whatsappBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || null;
+    const accessToken = userData?.whatsappAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || null;
+    const appSecret = userData?.whatsappAppSecret || process.env.WHATSAPP_APP_SECRET || null;
+
+    return {
+      phoneNumberId,
+      businessAccountId,
+      accessToken,
+      appSecret,
+      whatsappConnected: userData?.whatsappConnected || false,
+      whatsappPhone: userData?.whatsappPhone || null,
+      whatsappDisplayName: userData?.whatsappDisplayName || null,
+      phoneRegistered: userData?.whatsappPhoneRegistered || false,
+      webhookSubscribed: userData?.whatsappWebhookSubscribed || false,
+      uid
+    };
+  }
+
+  // Helper: create or fetch WhatsApp message QR code from Meta
+  async function getOrCreateQRCode(phoneNumberId: string, accessToken: string, prefilledMessage: string = 'Hi! I would like to connect with Beatrice.') {
+    try {
+      const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/message_qrdls`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prefilled_message: prefilledMessage,
+          generate_qr_image: 'PNG'
+        })
+      });
+      const result = await response.json();
+      return result;
+    } catch (err) {
+      console.error('QR code creation failed:', err);
+      return { error: { message: 'Failed to create QR code' } };
+    }
+  }
+
+  // Helper: list existing QR codes
+  async function listQRCodes(phoneNumberId: string, accessToken: string) {
+    try {
+      const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/message_qrdls?fields=code,prefilled_message,deep_link_url,qr_image_url.format(PNG)&limit=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      const result = await response.json();
+      return result;
+    } catch (err) {
+      console.error('QR code list failed:', err);
+      return { data: [] };
+    }
+  }
+
+  // Helper: subscribe app for WhatsApp webhooks
+  async function subscribeWebhooks(businessAccountId: string, accessToken: string, appId: string) {
+    const response = await fetch(`https://graph.facebook.com/v21.0/${businessAccountId}/subscribed_apps`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        app_id: appId
+      })
+    });
+    const result = await response.json();
+    return result;
+  }
+
+  // Helper: send WhatsApp message using specific user's credentials
+  async function sendWhatsAppMessage(phoneNumberId: string, accessToken: string, to: string, text: string) {
+    const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to,
+        type: 'text',
+        text: {
+          preview_url: false,
+          body: text
+        }
+      })
+    });
+    const result = await response.json();
+    return result;
+  }
+
+  // Helper: process inbound WhatsApp message through Beatrice agent
+  async function processInboundMessage(uid: string, from: string, messageText: string, credentials: any) {
+    const firestore = getFirestoreDb();
+
+    // Store inbound message in Firestore
+    await firestore.collection('users').doc(uid).collection('whatsapp_messages').add({
+      from,
+      text: messageText,
+      direction: 'inbound',
+      status: 'received',
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      // Send to Beatrice agent for intent detection and response
+      const chat = genAI.chats.create({
+        model: 'gemini-3.1-flash-lite',
+        config: {
+          systemInstruction: `You are Beatrice, an AI assistant managing WhatsApp messages for a business user. 
+A customer has sent a message to the user's WhatsApp. Analyze the message and respond naturally.
+If the customer is asking for something actionable (appointment, info, booking), acknowledge it and confirm what action will be taken.
+Keep responses concise and professional. This will be sent as a WhatsApp text message.`
+        }
+      });
+
+      const result = await chat.sendMessage({ message: `Customer message: "${messageText}"` });
+      const replyText = result.text;
+
+      // Send reply back through user's WhatsApp
+      const sendResult = await sendWhatsAppMessage(
+        credentials.phoneNumberId,
+        credentials.accessToken,
+        from,
+        replyText
+      );
+
+      // Log outbound reply
+      await firestore.collection('users').doc(uid).collection('whatsapp_messages').add({
+        to: from,
+        text: replyText,
+        direction: 'outbound',
+        status: sendResult.error ? 'failed' : 'sent',
+        messageId: sendResult.messages?.[0]?.id || null,
+        timestamp: new Date().toISOString()
+      });
+
+      return { success: true, reply: replyText };
+    } catch (err) {
+      console.error('Beatrice agent processing error:', err);
+      // Fallback: send a simple acknowledgment
+      try {
+        await sendWhatsAppMessage(
+          credentials.phoneNumberId,
+          credentials.accessToken,
+          from,
+          'Thank you for your message. We will get back to you shortly.'
+        );
+      } catch (fallbackErr) {
+        console.error('Fallback message also failed:', fallbackErr);
+      }
+      return { success: false, error: err };
+    }
+  }
+
+  // GET: Check WhatsApp connection status for authenticated user
   app.get('/api/whatsapp/connect', authenticateToken, async (req: any, res) => {
     try {
-      const firestore = getFirestoreDb();
-      const userDoc = await firestore.collection('users').doc(req.user.uid).get();
-      const userData = userDoc.exists ? userDoc.data() : {};
-      
-      const whatsappConnected = userData?.whatsappConnected || false;
-      const whatsappPhone = userData?.whatsappPhone || null;
-      const whatsappDisplayName = userData?.whatsappDisplayName || null;
-      
-      // Extended credentials from user document if exists, fallback to env
-      const phoneNumberId = userData?.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || null;
-      const businessAccountId = userData?.whatsappBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || null;
-      const accessToken = userData?.whatsappAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || null;
-
+      const creds = await resolveUserWhatsAppCredentials(req.user.uid);
       res.json({
-        status: "ready",
-        provider: "Meta for Developers Cloud API",
-        phoneNumberId,
-        businessAccountId,
-        whatsappConnected,
-        whatsappPhone,
-        whatsappDisplayName,
-        configured: !!accessToken && !!phoneNumberId
+        status: 'ready',
+        provider: 'Meta WhatsApp Cloud API',
+        phoneNumberId: creds.phoneNumberId,
+        businessAccountId: creds.businessAccountId,
+        whatsappConnected: creds.whatsappConnected,
+        whatsappPhone: creds.whatsappPhone,
+        whatsappDisplayName: creds.whatsappDisplayName,
+        phoneRegistered: creds.phoneRegistered,
+        webhookSubscribed: creds.webhookSubscribed,
+        configured: !!creds.accessToken && !!creds.phoneNumberId
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
+  // GET: Get or create WhatsApp QR code for authenticated user
+  app.get('/api/whatsapp/qr', authenticateToken, async (req: any, res) => {
+    try {
+      const creds = await resolveUserWhatsAppCredentials(req.user.uid);
+      
+      if (!creds.accessToken || !creds.phoneNumberId) {
+        return res.status(400).json({ error: 'WhatsApp not connected' });
+      }
+
+      // Try to get existing QR code first
+      const listResult = await listQRCodes(creds.phoneNumberId, creds.accessToken);
+      
+      if (listResult.data && listResult.data.length > 0) {
+        return res.json({
+          success: true,
+          qrCode: listResult.data[0]
+        });
+      }
+
+      // Create new QR code
+      const qrResult = await getOrCreateQRCode(creds.phoneNumberId, creds.accessToken);
+      
+      if (qrResult.error) {
+        console.warn('QR code creation failed, returning deep link fallback:', qrResult.error);
+        // Fallback: return a deep link URL that can still be used
+        return res.json({
+          success: true,
+          qrCode: {
+            deep_link_url: `https://wa.me/${creds.phoneNumberId}`,
+            code: 'fallback',
+            prefilled_message: 'Hi! I would like to connect with Beatrice.'
+          },
+          fallback: true
+        });
+      }
+
+      res.json({
+        success: true,
+        qrCode: qrResult
+      });
+    } catch (e: any) {
+      console.error('QR endpoint error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST: Regenerate WhatsApp QR code
+  app.post('/api/whatsapp/qr/regenerate', authenticateToken, async (req: any, res) => {
+    try {
+      const creds = await resolveUserWhatsAppCredentials(req.user.uid);
+      
+      if (!creds.accessToken || !creds.phoneNumberId) {
+        return res.status(400).json({ error: 'WhatsApp not connected' });
+      }
+
+      const qrResult = await getOrCreateQRCode(creds.phoneNumberId, creds.accessToken);
+      
+      if (qrResult.error) {
+        console.warn('QR regeneration failed:', qrResult.error);
+        return res.json({
+          success: true,
+          qrCode: {
+            deep_link_url: `https://wa.me/${creds.phoneNumberId}`,
+            code: 'fallback',
+            prefilled_message: 'Hi! I would like to connect with Beatrice.'
+          },
+          fallback: true
+        });
+      }
+
+      res.json({
+        success: true,
+        qrCode: qrResult
+      });
+    } catch (e: any) {
+      console.error('QR regenerate error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST: Pair/connect user's WhatsApp (uses server .env credentials)
   app.post('/api/whatsapp/pair', authenticateToken, async (req: any, res) => {
-    const { phone, displayName } = req.body;
     try {
       const firestore = getFirestoreDb();
       const finalPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -319,41 +560,58 @@ async function startServer() {
         });
       }
 
+      // Step 1: Subscribe webhooks
+      let webhookSubscribed = false;
+      try {
+        const appId = process.env.FACEBOOK_APP_ID || '';
+        if (finalBusinessAccountId && appId) {
+          const subResult = await subscribeWebhooks(finalBusinessAccountId, finalAccessToken, appId);
+          webhookSubscribed = subResult.success === true;
+          console.log(`Webhook subscription for user ${req.user.uid}:`, subResult);
+        }
+      } catch (subErr: any) {
+        console.warn(`Webhook subscription skipped/failed for user ${req.user.uid}:`, subErr.message);
+      }
+
+      // Step 2: Store connection state in user's Firestore document
       await firestore.collection('users').doc(req.user.uid).set({
         whatsappConnected: true,
-        whatsappPhone: phone || null,
-        whatsappDisplayName: displayName || null,
+        whatsappPhone: null,
+        whatsappDisplayName: null,
         whatsappPhoneId: finalPhoneId,
         whatsappBusinessAccountId: finalBusinessAccountId,
         whatsappAccessToken: finalAccessToken,
+        whatsappWebhookSubscribed: webhookSubscribed,
+        whatsappConnectedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
       res.json({
         success: true,
         whatsappConnected: true,
-        whatsappPhone: phone || null,
-        whatsappDisplayName: displayName || null
+        whatsappPhone: null,
+        whatsappDisplayName: 'Connected Account',
+        webhookSubscribed
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
+  // POST: Disconnect user's WhatsApp
   app.post('/api/whatsapp/disconnect', authenticateToken, async (req: any, res) => {
     try {
       const firestore = getFirestoreDb();
-      await firestore.collection('users').doc(req.user.uid).update({
+      await firestore.collection('users').doc(req.user.uid).set({
         whatsappConnected: false,
         whatsappPhone: admin.firestore.FieldValue.delete(),
         whatsappDisplayName: admin.firestore.FieldValue.delete(),
+        whatsappPhoneRegistered: false,
+        whatsappWebhookSubscribed: false,
         updatedAt: new Date().toISOString()
-      });
+      }, { merge: true });
 
-      res.json({
-        success: true,
-        whatsappConnected: false
-      });
+      res.json({ success: true, whatsappConnected: false });
     } catch (e: any) {
       try {
         const firestore = getFirestoreDb();
@@ -361,51 +619,33 @@ async function startServer() {
           whatsappConnected: false,
           updatedAt: new Date().toISOString()
         }, { merge: true });
-        res.json({
-          success: true,
-          whatsappConnected: false
-        });
+        res.json({ success: true, whatsappConnected: false });
       } catch (innerErr: any) {
         res.status(500).json({ error: innerErr.message });
       }
     }
   });
 
+  // POST: Send WhatsApp message (uses per-user credentials)
   app.post('/api/whatsapp/send', authenticateToken, async (req: any, res) => {
-    const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    
-    const phone = req.body.phone;
-    const text = req.body.text;
+    const { phone, text } = req.body;
 
-    if (!whatsappToken || !phoneNumberId) {
-      return res.status(400).json({
-        error: 'WhatsApp integration is not fully configured on the server.',
-        message: 'Please define the WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables in your server configuration to enable production-level WhatsApp messaging.'
-      });
+    if (!phone || !text) {
+      return res.status(400).json({ error: 'phone and text are required' });
     }
 
     try {
-      // Standard Graph API fetch for Meta Cloud WhatsApp API
-      const response = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${whatsappToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: phone,
-          type: "text",
-          text: {
-            preview_url: false,
-            body: text
-          }
-        })
-      });
+      // Resolve per-user credentials first
+      const creds = await resolveUserWhatsAppCredentials(req.user.uid);
 
-      const result = await response.json();
+      if (!creds.accessToken || !creds.phoneNumberId) {
+        return res.status(400).json({
+          error: 'WhatsApp not connected',
+          message: 'Connect your WhatsApp account before sending messages'
+        });
+      }
+
+      const result = await sendWhatsAppMessage(creds.phoneNumberId, creds.accessToken, phone, text);
 
       // Log to Firestore
       try {
@@ -426,6 +666,117 @@ async function startServer() {
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==========================================
+  // WhatsApp Webhook Endpoints (Meta Cloud API)
+  // ==========================================
+
+  // GET: Webhook verification (Meta sends this to verify the endpoint)
+  app.get('/api/whatsapp/webhook', async (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const expectedToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'eburon-whatsapp-webhook-2026';
+
+    if (mode === 'subscribe' && token === expectedToken) {
+      console.log('WhatsApp webhook verified successfully');
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
+  });
+
+  // POST: Webhook handler for inbound WhatsApp messages
+  app.post('/api/whatsapp/webhook', async (req, res) => {
+    const body = req.body;
+
+    // Acknowledge receipt immediately (Meta expects 200 within 20 seconds)
+    res.sendStatus(200);
+
+    try {
+      // Parse the incoming webhook payload
+      const entry = body.entry?.[0];
+      if (!entry) return;
+
+      const changes = entry.changes || [];
+      for (const change of changes) {
+        const value = change.value;
+        if (!value || !value.messages) continue;
+
+        const phoneNumberId = value.metadata?.phone_number_id;
+        const displayName = value.metadata?.display_phone_number;
+
+        // Find the user who owns this phone number
+        const firestore = getFirestoreDb();
+        const usersSnapshot = await firestore.collection('users')
+          .where('whatsappPhoneId', '==', phoneNumberId)
+          .get();
+
+        if (usersSnapshot.empty) {
+          console.warn(`No user found for WhatsApp phone number ID: ${phoneNumberId}`);
+          continue;
+        }
+
+        for (const message of value.messages) {
+          const from = message.from;
+          let messageText = '';
+
+          if (message.type === 'text') {
+            messageText = message.text?.body || '';
+          } else if (message.type === 'image') {
+            messageText = '[Image received]';
+          } else if (message.type === 'audio') {
+            messageText = '[Audio message received]';
+          } else if (message.type === 'document') {
+            messageText = '[Document received]';
+          } else {
+            messageText = `[${message.type} message received]`;
+          }
+
+          if (!messageText) continue;
+
+          // Route to the correct user's Beatrice agent
+          for (const userDoc of usersSnapshot.docs) {
+            const uid = userDoc.id;
+            const userData = userDoc.data();
+            const creds = {
+              phoneNumberId: userData.whatsappPhoneId,
+              accessToken: userData.whatsappAccessToken,
+              uid
+            };
+
+            console.log(`Routing WhatsApp message from ${from} to user ${uid}: "${messageText}"`);
+
+            // Process through Beatrice agent (async, don't block webhook response)
+            processInboundMessage(uid, from, messageText, creds).catch(err => {
+              console.error(`Error processing inbound WhatsApp for user ${uid}:`, err);
+            });
+          }
+        }
+
+        // Handle message status updates (sent, delivered, read, failed)
+        if (value.statuses) {
+          for (const status of value.statuses) {
+            const uid = status.recipient_id;
+            try {
+              const firestore = getFirestoreDb();
+              await firestore.collection('users').doc(uid).collection('whatsapp_messages').add({
+                messageId: status.id,
+                status: status.status,
+                direction: 'status_update',
+                timestamp: new Date().toISOString()
+              });
+            } catch (err) {
+              console.warn('Failed to log WhatsApp status update:', err);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('WhatsApp webhook processing error:', err);
     }
   });
   if (!IS_PROD) {
