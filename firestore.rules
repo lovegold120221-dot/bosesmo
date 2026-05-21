@@ -23,7 +23,13 @@ service cloud.firestore {
         && (data.accessToken == null || data.accessToken is string)
         && (data.updatedAt == null || data.updatedAt is string)
         && (data.memories == null || data.memories is list)
-        && (data.settings == null || data.settings is map);
+        && (data.settings == null || data.settings is map)
+        && (data.appName == null || data.appName is string)
+        && (data.personaLanguage == null || data.personaLanguage is string)
+        && (data.personaName == null || data.personaName is string)
+        && (data.userCallName == null || data.userCallName is string)
+        && (data.personaTraits == null || data.personaTraits is map)
+        && (data.language == null || data.language is string);
     }
 
     function isValidHistory(data) {

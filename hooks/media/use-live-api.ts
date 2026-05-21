@@ -462,11 +462,58 @@ export function useLiveApi({
             }
         }
 
+        if (fc.name === 'check_whatsapp_messages') {
+            const { limit } = fc.args as any;
+            try {
+                // Request live data from phone session (Multi-Device CRUD)
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch(`/api/whatsapp/messages?live=true&limit=${limit || 10}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
+            } catch (e: any) {
+                responsePayload = { error: e.message };
+            }
+        }
+
+        if (fc.name === 'check_whatsapp_status') {
+            try {
+                responsePayload = await api.connectWhatsapp();
+            } catch (e: any) {
+                responsePayload = { error: e.message };
+            }
+        }
+
         if (fc.name === 'connect_whatsapp') {
             try {
                 responsePayload = await api.connectWhatsapp();
                 const uiState = await import('../../lib/state');
                 uiState.useUI.getState().setActiveOverlay('whatsapp');
+            } catch (e: any) {
+                responsePayload = { error: e.message };
+            }
+        }
+
+        if (fc.name === 'disconnect_whatsapp') {
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                const headers: any = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch('/api/whatsapp/disconnect', { method: 'POST', headers });
+                responsePayload = await res.json();
+            } catch (e: any) {
+                responsePayload = { error: e.message };
+            }
+        }
+
+        if (fc.name === 'recall_memory') {
+            const { query } = fc.args as any;
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch(`/api/memory/recall?query=${encodeURIComponent(query)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                responsePayload = await res.json();
             } catch (e: any) {
                 responsePayload = { error: e.message };
             }

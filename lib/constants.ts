@@ -23,7 +23,7 @@
  */
 export const DEFAULT_LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
 
-export const DEFAULT_VOICE = 'Spider-Man (Male)';
+export const DEFAULT_VOICE = 'Scarlet Witch (Female)';
 
 export const VOICE_MAP: Record<string, string> = {
   "Scarlet Witch (Female)": "Aoede",

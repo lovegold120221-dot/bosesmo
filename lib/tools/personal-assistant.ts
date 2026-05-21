@@ -79,4 +79,20 @@ export const personalAssistantTools: FunctionCall[] = [
     isEnabled: true,
     scheduling: FunctionResponseScheduling.INTERRUPT,
   },
+  {
+    name: 'recall_memory',
+    description: 'Searches through long-term semantic memory to recall past conversations, specific details, or learned preferences about the Boss. Use this whenever the Boss asks about something previously discussed or when you need context from the past.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: {
+          type: 'STRING',
+          description: 'The semantic search query (e.g., "what did we say about the project deadline?").',
+        },
+      },
+      required: ['query'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
 ];

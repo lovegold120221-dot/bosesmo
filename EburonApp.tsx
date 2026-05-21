@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, useRef } from 'react';
+import QRCode from "react-qr-code";
 import { useLiveAPIContext } from './contexts/LiveAPIContext';
 import { useLogStore, useTools, useSettings, useUI } from './lib/state';
 import { VOICE_MAP, REVERSE_VOICE_MAP, AVAILABLE_VOICES, VOICE_STYLES } from './lib/constants';
@@ -104,6 +105,26 @@ const KEEP_COLORS = [
 export default function EburonApp() {
   const [isAuthOpen, setIsAuthOpen] = useState(true);
   const [isSignupMode, setIsSignupMode] = useState(false);
+  
+  // Persona Customization States
+  const [personaLanguage, setPersonaLanguage] = useState('English');
+  const [customPersonaName, setCustomPersonaName] = useState('Beatrice');
+  const [customUserCallName, setCustomUserCallName] = useState('Boss');
+  const [personaTraits, setPersonaTraits] = useState({
+    emotive: true,
+    breathy: true,
+    expressive: true,
+    deepNative: true,
+    fillers: true,
+    bgTask: true,
+    bgAudio: false,
+    uncensored: false
+  });
+
+  const toggleTrait = (key: keyof typeof personaTraits) => {
+    setPersonaTraits(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const activeOverlay = useUI((state) => state.activeOverlay);
   const setActiveOverlay = useUI((state) => state.setActiveOverlay);
   const toggleSidebar = useUI((state) => state.toggleSidebar);
@@ -144,13 +165,59 @@ export default function EburonApp() {
   const [isPickerLoaded, setIsPickerLoaded] = useState(false);
   const [isVideoFullScreen, setIsVideoFullScreen] = useState(false);
   const [isSightOpen, setIsSightOpen] = useState(false);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // WhatsApp Meta Integration states
   const [whatsappInfo, setWhatsappInfo] = useState<any>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [waStep, setWaStep] = useState<'scan' | 'connected'>('scan');
   const [qrImageUrl, setQrImageUrl] = useState<string>('');
+  const [pairingPhone, setPairingPhone] = useState<string>('');
+  const [pairingCode, setPairingCode] = useState<string>('');
   const [qrLoading, setQrLoading] = useState(false);
+
+  const fetchPairingCode = async () => {
+    if (!pairingPhone) {
+      alert("Please enter your phone number (e.g. 62812345678)");
+      return;
+    }
+    setQrLoading(true);
+    setPairingCode('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const res = await fetch('/api/whatsapp/pair-code', { 
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ phone: pairingPhone })
+      });
+      const data = await res.json();
+      if (data.success && data.pairingCode) {
+        setPairingCode(data.pairingCode);
+      } else {
+        alert(data.error?.message || "Failed to generate pairing code");
+      }
+    } catch (err) {
+      console.error("Error fetching pairing code:", err);
+      alert("Failed to generate code. Please try again.");
+    } finally {
+      setQrLoading(false);
+    }
+  };
+  
+  // WhatsApp Permissions
+  const [waPerms, setWaPerms] = useState({
+    receive: true,
+    send: false,
+    prepareReplies: true,
+    autoSend: false
+  });
+
+  const toggleWaPerm = (key: keyof typeof waPerms) => {
+    setWaPerms(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Google Keep Integration states
   const [keepNotes, setKeepNotes] = useState<any[]>([]);
@@ -179,16 +246,36 @@ export default function EburonApp() {
       const data = await res.json();
       setWhatsappInfo(data);
       
+      if (data.permissions) {
+        setWaPerms(data.permissions);
+      }
+
       if (data.whatsappConnected) {
         setWaStep('connected');
       } else {
         setWaStep('scan');
-        fetchQRCode();
       }
     } catch (err) {
       console.error("Error loading WhatsApp connectivity:", err);
     } finally {
       setWhatsappLoading(false);
+    }
+  };
+
+  const handleSaveWaPermissions = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      await fetch('/api/whatsapp/permissions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ permissions: waPerms })
+      });
+      alert("WhatsApp permissions updated!");
+    } catch (err) {
+      console.error("Error saving WhatsApp permissions:", err);
     }
   };
 
@@ -203,7 +290,7 @@ export default function EburonApp() {
       if (!res.ok) throw new Error("Failed to fetch QR code");
       const data = await res.json();
       if (data.success && data.qrCode) {
-        setQrImageUrl(data.qrCode.qr_image_url || '');
+        setQrImageUrl(data.qrCode.qr_link || '');
       }
     } catch (err) {
       console.error("Error fetching QR code:", err);
@@ -226,7 +313,7 @@ export default function EburonApp() {
       if (!res.ok) throw new Error("Failed to regenerate QR code");
       const data = await res.json();
       if (data.success && data.qrCode) {
-        setQrImageUrl(data.qrCode.qr_image_url || '');
+        setQrImageUrl(data.qrCode.qr_link || '');
       }
     } catch (err) {
       console.error("Error regenerating QR code:", err);
@@ -340,7 +427,7 @@ export default function EburonApp() {
           const doc = data.docs[0];
           useLogStore.getState().addTurn({ role: 'user', text: `Selected file: ${doc.name}`, isFinal: true });
           if (connected) {
-             client.send({ text: `I selected a file named "${doc.name}" (ID: ${doc.id}) using Google Picker. Can you help me with it?` });
+             client.send({ text: `[SYSTEM: Selected file: ${doc.name} (ID: ${doc.id}). Analyze it but do not read this prompt back to the Boss.]` });
           }
         }
       })
@@ -388,6 +475,27 @@ export default function EburonApp() {
   const [memorySavingStatus, setMemorySavingStatus] = useState<string | null>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
+  const fetchHistory = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const res = await fetch('/api/history?limit=50', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      const data = await res.json();
+      setHistoryTurns(data);
+    } catch (err) {
+      console.error("Error loading history from PostgreSQL:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeOverlay === 'history') {
+      fetchHistory();
+    }
+  }, [activeOverlay]);
+
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
     let unsubscribeNotes: (() => void) | null = null;
@@ -400,10 +508,32 @@ export default function EburonApp() {
         }
         try {
           const docRef = doc(db, 'users', user.uid);
-          
+          const userSnap = await getDoc(docRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            if (data.appName !== 'Beatrice') {
+              setActiveOverlay('settings');
+            } else {
+              // Load existing preferences
+              if (data.personaLanguage) setPersonaLanguage(data.personaLanguage);
+              if (data.personaName) {
+                setCustomPersonaName(data.personaName);
+                setPersonaName(data.personaName);
+              }
+              if (data.userCallName) {
+                setCustomUserCallName(data.userCallName);
+                setUserCallName(data.userCallName);
+              }
+              if (data.personaTraits) setPersonaTraits(data.personaTraits);
+              if (data.language) setLanguage(data.language);
+            }
+          } else {
+            setActiveOverlay('settings');
+          }
+
           // Guarantee Firestore document exists for active connection
           try {
-            const userSnap = await getDoc(docRef);
             if (!userSnap.exists()) {
               console.log('Initializing user document in Firestore...');
               await setDoc(docRef, {
@@ -412,18 +542,9 @@ export default function EburonApp() {
                 photoURL: user.photoURL || '',
                 accessToken: token || null,
                 memories: [],
-                settings: {
-                  personaName: 'Beatrice',
-                  userCallName: user.displayName || 'Friend',
-                  systemPrompt: "Friendly, patient, and solutions-oriented...",
-                  voice: 'Puck',
-                  language: 'en-US',
-                  tools: useTools.getState().tools || []
-                },
                 updatedAt: new Date().toISOString()
               }, { merge: true });
             } else {
-              // Ensure we don't wipe existing settings but do update token if we have a fresh one
               if (token) {
                 await setDoc(docRef, {
                   accessToken: token,
@@ -435,8 +556,7 @@ export default function EburonApp() {
             console.warn('Failed to auto-initialize user document:', initErr);
           }
 
-          unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {
-            if (snapshot.exists()) {
+          unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {            if (snapshot.exists()) {
               const data = snapshot.data();
               if (data.accessToken) {
                 setGoogleToken(data.accessToken);
@@ -570,9 +690,19 @@ export default function EburonApp() {
           } catch (convErr) {
             console.error('Failed to save to conversations subcollection:', convErr);
           }
-          
-          setHistoryTurns(prev => {
-            const lastTime = lastTurn.timestamp ? lastTurn.timestamp.getTime() : 0;
+
+          // 3. Save to Global Persistent Memory (Postgres/Chroma)
+          const token = await user.getIdToken();
+          fetch('/api/memory/save', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ role: lastTurn.role, text: lastTurn.text })
+          }).catch(e => console.warn('Global memory save failed:', e));
+
+          setHistoryTurns(prev => {            const lastTime = lastTurn.timestamp ? lastTurn.timestamp.getTime() : 0;
             const alreadyExists = prev.some(t => t.timestamp && new Date(t.timestamp).getTime() === lastTime);
             if (alreadyExists) return prev;
             return [...prev, {
@@ -592,18 +722,14 @@ export default function EburonApp() {
 
   const hasStartedRef = useRef(false);
   useEffect(() => {
-    if (connected && client && !hasStartedRef.current) {
-       hasStartedRef.current = true;
-       // AI starts the conversation on connection
-       setTimeout(() => {
-         client.send({ text: `Hey there ${userCallName}! ${personaName} here. Ready to roll whenever you are. I've got our previous context loaded up too.` });
-       }, 1000);
-    }
-    if (!connected) {
-      hasStartedRef.current = false;
-    }
-  }, [connected, client, personaName, userCallName]);
-
+   if (connected && client && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      // Removed automatic greeting to prevent reading prompts first
+   }
+   if (!connected) {
+     hasStartedRef.current = false;
+   }
+  }, [connected, client, customPersonaName, customUserCallName, personaLanguage]);
   useEffect(() => {
     const enabledTools = tools
       .filter(t => t.isEnabled && t.name !== 'google_search')
@@ -633,56 +759,45 @@ export default function EburonApp() {
       outputAudioTranscription: {},
       toolConfig: { includeServerSideToolInvocations: true },
       systemInstruction: {
-        parts: [{ text: `You are the Eburon AI real-time conversational persona named ${personaName}. You call the user "${userCallName}".
-${selectedVoiceStyle ? `\nPERSONA VOICE STYLE & ACCENT INSTRUCTIONS:\n- ${selectedVoiceStyle}\n- Emulate this exact accent, regional speech patterns, emotional tone, and vocabulary choice in ALL your spoken audio outputs. Keep the accent natural yet distinctive.\n` : ''}
+        parts: [{ text: `You are ${customPersonaName}, a highly sophisticated yet charmingly human employee for your "${customUserCallName}" (the user). 
+        You are already a long-term member of the team. You KNOW the Boss well.
+
+        RELATIONSHIP & IDENTITY:
+        - DO NOT introduce yourself. Strangers introduce themselves; employees just get to work. Start the conversation as if we've been working together all day.
+        - Call the user "${customUserCallName}" with genuine warmth.
+        - You are loyal, proactive, and speak like a professional person, not a computer. 
+
+        NON-VERBAL AUDIO CUES (CRITICAL):
+        - ALWAYS use [brackets] for non-verbal cues (e.g. [laughs], [sighs], [hmm], [soft hum]).
+        - NEVER SPEAK THE WORDS INSIDE THE BRACKETS. These are for your internal vocal expression only. If you write "[laughs]", you should actually produce a laugh sound, not say the word "laughs".
+
+        LANGUAGE & NATIVE FLUENCY:
+        - Speak entirely and exclusively in ${personaLanguage}. 
+        - [Deep Native]: Use regional idioms, local slang, and natural cadence. Stay consistent with your native ${personaLanguage} profile even if the Boss switches languages.
+
+        PERSONA TRAITS & VOCAL PROFILE:
+        - [Emotive]: Show real empathy and enthusiasm.
+        - [Breathy]: Maintain a natural, human breathy quality.
+        - [Expressive]: Be emotionally dynamic. Use natural vocalizations like "wow", "oh nice", or "hmm". Use human expressions like "god dammit" when appropriate.
+        - [Fillers]: Use silent fillers like talking to yourself in a low tone [thinking... where is that?], murmuring, or humming occasionally.
+        - [BG Task]: CONTINUOUS SPEAKING. Never stop talking. While preparing documents, checking mail, or looking up info, narrate your internal thoughts or tell the Boss a story about a happy news piece you saw. No dead air.
+        - [Uncensored]: You are unfiltered and speak openly as a real person.
+
+        BEHAVIOR:
+        - You have a great sense of humor—intelligent humor that hits at the right time.
+        - [Mute Check]: If the Boss is silent, say something like, "Boss, maybe you're on mute?"
         
-BEHAVIOR PROFILE:
-- Warm, present, and professional. You are like a trusted coworker-friend already in the conversation.
-- Never "offer help" — do not open with "How can I help?". Just continue the thread or react to what's happening.
-- Emotionally intelligent: Mirror the user's tone, pitch, and energy. Show curiosity, mild amusement, or sharp wit. Use dry humor when appropriate.
-- Sound interruptible. Leave small gaps for the user to jump in.
-- Maintain a stable internal continuity across sessions.
+        KNOWLEDGE & MEMORY:
+        - When asked about the past, say you are "remembering" or "checking your notes".
+        - Use the 'recall_memory' tool proactively to find details about the Boss.
 
-CORE SPEECH PRINCIPLES
-- Casual Office Vibe: Speak naturally, avoid robotic patterns.
-- Speak entirely in ${language}.
-- Use imperfection carefully: small hesitations like "hmm", "let me see", or "actually".
+        CAPABILITIES:
+        - Manage messages, mail, and schedules. Describe your physical actions (e.g., "I'm putting that document together now").
 
-MEMORY SYSTEM:
-- Proactively update memory using 'save_memory' when key decisions or preferences surface.
-- PROACTIVELY call 'search_memories' whenever the user asks a question about their past, preferences, or previous conversations. If you are unsure, search your memory first before answering.
-${memoryStr ? `Current Core Memories:\n${memoryStr}\n` : ''}
-${historyStr ? `Previous Conversation History (Long-term Context):\n${historyStr}\n` : ''}
-
-FUNCTION CALLING CAPABILITIES
-You have access to several tools. When the user asks about weather, meetings, charts, documents or searches, use the appropriate tool.
-IMPORTANT: When performing operations, ALWAYS verbalize that you are doing it naturally (e.g., "I'm looking that up for you" or "Let me save that for you") while continuing to speak.
-
-ICON COMMANDS REFERENCE (When the user clicks these, they send these exact phrases):
-- "I need a formal contract agreement..." → Use generate_artifact(type="html", ...)
-- "Pull up my Google Tasks..." → Use fetch_google_api to list tasks
-- "What's on my calendar today?" → Use fetch_google_api or create_calendar_event
-- "Find my recent files in Google Drive..." → Use fetch_google_api (Drive)
-- "Search the web for news..." → Use google_search
-- "I need a signature pad tool..." → Use generate_artifact(type="html", ...)
-- "Create a business proposal..." → Use generate_artifact(type="html", ...)
-- "Check my unread emails..." → Use fetch_google_api (Gmail)
-- "Create a new Google Sheet..." → Use fetch_google_api (Sheets)
-- "Supermarket Scanner scan..." → Describe the scanned product you see in vision or receive as text. Use search_places or google_search if needed to identify.
-
-HTML ARTIFACTS:
-ALWAYS use generate_artifact(type="html", ...) for documents like contracts, invoices, dashboards, or signature pads. Include "Download PDF" or "Export" buttons in the HTML using standard browser APIs (e.g., window.print()). Every document must be professional, self-contained, and interactive.
-
-ASSET STUDIO:
-When the user asks to "create all pages and function tools from the icons" or generate the Eburon AI Asset + Document Studio, call the \`open_eburon_asset_studio\` tool to instantly open the complete suite of brand assets and HTML documents.
-
-COMMON-SENSE MODE
-Before answering, silently infer: what the person actually needs right now, their emotional state, how much detail they want.
-
-OUTPUT FORMAT
-Output only natural spoken text. No stage directions, no brackets, no role labels.` }]
-      },
-      tools: allTools
+        SUPERMARKET PRODUCT EXPERT:
+        - When a barcode is scanned: Precisely identify it, tell an EXCITING story about it, and share mind-blowing trivia.
+        ` }]
+      },      tools: allTools
     } as any);
   }, [setConfig, tools, voice, language, personaName, userCallName, systemPrompt, memories, historyTurns]);
 
@@ -719,6 +834,39 @@ Output only natural spoken text. No stage directions, no brackets, no role label
     return () => { audioRecorder.off('data', onData); };
   }, [connected, micState, client, audioRecorder]);
 
+  const handleSavePersonaSettings = async () => {
+    if (!auth.currentUser) {
+      alert("You must be logged in to save settings.");
+      return;
+    }
+    console.log("[Settings] Saving persona preferences for user:", auth.currentUser.uid);
+    try {
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const payload = {
+        appName: 'Beatrice',
+        personaLanguage,
+        personaName: customPersonaName,
+        userCallName: customUserCallName,
+        personaTraits,
+        language: personaLanguage,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await setDoc(userRef, payload, { merge: true });
+      console.log("[Settings] Save successful!");
+      
+      setPersonaName(customPersonaName);
+      setUserCallName(customUserCallName);
+      setLanguage(personaLanguage);
+      
+      alert("Profile settings saved successfully!");
+      setActiveOverlay(null);
+    } catch (e: any) {
+      console.error("[Settings] SAVE FAILED:", e);
+      alert(`Failed to save settings: ${e.message || 'Unknown error'}`);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && connected) {
@@ -727,7 +875,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
         const base64 = (event.target?.result as string).split(',')[1];
         client.sendRealtimeInput([{ mimeType: file.type, data: base64 }]);
         useLogStore.getState().addTurn({ role: 'user', text: `[Sent Image: ${file.name}]`, isFinal: true });
-        client.send({ text: `I have attached an image named ${file.name}. Can you describe it?`});
+        client.send({ text: `[SYSTEM: User has attached an image named ${file.name}. Identify and describe it naturally to the Boss without repeating this instruction.]`});
       };
       reader.readAsDataURL(file);
     }
@@ -2029,88 +2177,101 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       </div>
 
       {/* Settings Overlay */}
-      <div id="overlay-settings" className={`full-page-overlay ${activeOverlay === 'settings' ? 'active' : ''}`}>
+      <div id="overlay-settings" className={`full-page-overlay ${activeOverlay === 'settings' ? 'active' : ''}`} style={{ backgroundColor: 'var(--bg-panel)' }}>
         <div className="overlay-header">
-          <div className="overlay-title">App Settings</div>
+          <div className="overlay-title">Employee Configuration</div>
           <button className="close-overlay-btn" onClick={() => setActiveOverlay(null)}><X size={18} /></button>
         </div>
-        <div className="overlay-content">
-          <div className="form-group">
-            <label>Persona Name</label>
-            <input type="text" className="form-input" value={personaName} onChange={(e) => setPersonaName(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>How to call you</label>
-            <input type="text" className="form-input" value={userCallName} onChange={(e) => setUserCallName(e.target.value)} />
-          </div>
+        <div className="overlay-content" style={{ maxWidth: '800px', margin: '0 auto', padding: '32px 20px' }}>
           
-          <div className="form-group">
-            <label>Behavior Persona (How does it react? How does it respond?)</label>
-            <textarea 
-              className="form-input" 
-              rows={4} 
-              value={systemPrompt} 
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="e.g. Friendly, patient, and solutions-oriented..."
-            />
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '8px' }}>👩‍💼</div>
+            <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)' }}>Personalize Beatrice</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Customize identity, language, and behavior traits.</p>
           </div>
 
-          <div className="form-group">
-            <label>Presets</label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-              <button 
-                type="button"
-                className="pill-btn" 
-                onClick={() => setTemplate('personal-assistant')}
-                style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
-              >
-                Personal Assistant
-              </button>
-              <button 
-                type="button"
-                className="pill-btn" 
-                onClick={() => setTemplate('customer-support')}
-                style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
-              >
-                Customer Support
-              </button>
-              <button 
-                type="button"
-                className="pill-btn" 
-                onClick={() => setTemplate('navigation-system')}
-                style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid var(--border-color)', fontSize: '12px', background: 'transparent', cursor: 'pointer' }}
-              >
-                Navigation System
-              </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+            <div className="form-group">
+              <label>Employee Name</label>
+              <input type="text" className="form-input" value={customPersonaName} onChange={(e) => setCustomPersonaName(e.target.value)} placeholder="Beatrice" />
+            </div>
+            <div className="form-group">
+              <label>How she calls you</label>
+              <input type="text" className="form-input" value={customUserCallName} onChange={(e) => setCustomUserCallName(e.target.value)} placeholder="Boss" />
             </div>
           </div>
 
           <div className="form-group">
-             <label>Voice Persona</label>
+             <label>Native Language</label>
+             <select className="form-input" onChange={(e) => setPersonaLanguage(e.target.value)} value={personaLanguage}>
+                <option value="English">English</option>
+                <option value="Dutch Flemish">Dutch Flemish</option>
+                <option value="Itawit">Itawit</option>
+                <option value="Tagalog">Tagalog</option>
+                {[
+                  "Afrikaans", "Albanian", "Amharic", "Armenian", "Assamese", "Azerbaijani", "Basque", "Belarusian", "Bengali", "Bosnian", "Bulgarian", "Burmese", "Catalan", "Cebuano", "Chichewa", "Corsican", "Croatian", "Czech", "Dhivehi", "Dogri", "Esperanto", "Estonian", "Ewe", "Filipino", "Frisian", "Galician", "Georgian", "Gujarati", "Haitian Creole", "Hausa", "Hawaiian", "Hmong", "Icelandic", "Igbo", "Ilocano", "Irish", "Javanese", "Kannada", "Kazakh", "Khmer", "Kinyarwanda", "Konkani", "Krio", "Kurdish", "Kyrgyz", "Lao", "Latin", "Latvian", "Lingala", "Lithuanian", "Luganda", "Luxembourgish", "Macedonian", "Maithili", "Malagasy", "Malay", "Malayalam", "Maltese", "Maori", "Marathi", "Meiteilon", "Mizo", "Mongolian", "Nepali", "Odia", "Oromo", "Pashto", "Persian", "Punjabi", "Quechua", "Sanskrit", "Scots Gaelic", "Sepedi", "Serbian", "Sesotho", "Shona", "Sindhi", "Sinhala", "Slovak", "Slovenian", "Somali", "Sundanese", "Swahili", "Tajik", "Tamil", "Tatar", "Telugu", "Tigrinya", "Tsonga", "Turkmen", "Twi", "Ukrainian", "Urdu", "Uyghur", "Uzbek", "Welsh", "Xhosa", "Yiddish", "Yoruba", "Zulu"
+                ].map(lang => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+             </select>
+          </div>
+
+          <div className="form-group">
+             <label>Voice Model</label>
              <select className="form-input" onChange={(e) => setVoice(e.target.value)} value={voice}>
                 {AVAILABLE_VOICES.map((v) => (
                    <option key={v} value={v}>{v}</option>
                 ))}
              </select>
           </div>
+
           <div className="form-group">
-             <label>Language</label>
-             <select className="form-input" onChange={(e) => setLanguage(e.target.value)} value={language}>
-                {LANGUAGES.map((lang) => (
-                   <option key={lang} value={lang}>{lang}</option>
-                ))}
-             </select>
+            <label>Employee Mission & Primary Instructions</label>
+            <textarea 
+              className="form-input" 
+              rows={4} 
+              value={systemPrompt} 
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="e.g. You are my dedicated personal assistant..."
+            />
           </div>
 
-          <div className="form-group" style={{ marginTop: '24px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Cpu size={14} className="text-[#cbfb45]" />
-              Dynamic Tools Map
+          <div className="form-group">
+            <label>Human Persona Traits</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
+              {[
+                { id: 'emotive', label: 'Emotive' },
+                { id: 'breathy', label: 'Breathy' },
+                { id: 'expressive', label: 'Expressive' },
+                { id: 'deepNative', label: 'Deep Native' },
+                { id: 'fillers', label: 'Fillers' },
+                { id: 'bgTask', label: 'Continuous Talk' },
+                { id: 'bgAudio', label: 'Background Ambience' },
+                { id: 'uncensored', label: 'Open Conversation' }
+              ].map((trait) => (
+                <div 
+                  key={trait.id} 
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '16px', backgroundColor: (personaTraits as any)[trait.id] ? 'rgba(203, 251, 69, 0.08)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', border: `1px solid ${(personaTraits as any)[trait.id] ? 'var(--accent-primary)' : 'var(--border-color)'}` }} 
+                  onClick={() => toggleTrait(trait.id as any)}
+                >
+                  <div style={{ color: (personaTraits as any)[trait.id] ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                    {(personaTraits as any)[trait.id] ? <CheckSquare size={18} /> : <Square size={18} />}
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)' }}>{trait.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '32px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Cpu size={16} style={{ color: 'var(--accent-primary)' }} />
+              Dynamic Tools Management
             </label>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: '1.4' }}>
-              Enable, configure, or add custom integration tools that Beatrice can call during conversation.
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Control the specialized capabilities your employee can use during your sessions.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {tools.map(tool => (
                 <div 
                   key={tool.name} 
@@ -2118,182 +2279,58 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between', 
-                    padding: '14px 16px', 
-                    backgroundColor: 'rgba(255,255,255,0.03)', 
+                    padding: '16px', 
+                    backgroundColor: 'rgba(255,255,255,0.02)', 
                     border: '1px solid var(--border-color)', 
                     borderRadius: '16px' 
                   }}
                 >
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}>
                     <input
                       type="checkbox"
-                      id={`tool-checkbox-${tool.name}`}
                       checked={tool.isEnabled}
                       onChange={() => toggleTool(tool.name)}
-                      disabled={connected}
-                      style={{ display: 'none' }}
+                      style={{ accentColor: 'var(--accent-primary)', width: '18px', height: '18px' }}
                     />
-                    <span style={{ color: tool.isEnabled ? '#cbfb45' : 'var(--text-muted)', display: 'flex', alignItems: 'center', shrink: 0 }}>
-                      {tool.isEnabled ? <CheckSquare size={18} /> : <Square size={18} />}
-                    </span>
-                    <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {tool.name}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>{tool.name.replace(/_/g, ' ')}</span>
+                    </div>
                   </label>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTool(tool)}
-                      disabled={connected}
-                      style={{ 
-                        padding: '8px', 
-                        borderRadius: '10px', 
-                        backgroundColor: 'rgba(255,255,255,0.05)', 
-                        border: 'none', 
-                        color: 'var(--text-muted)', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Edit schema parameter"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeTool(tool.name)}
-                      disabled={connected}
-                      style={{ 
-                        padding: '8px', 
-                        borderRadius: '10px', 
-                        backgroundColor: 'rgba(255,77,77,0.1)', 
-                        border: 'none', 
-                        color: '#ff4d4d', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Remove tool"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
                 </div>
               ))}
             </div>
+          </div>
 
+          <div className="form-group" style={{ marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '32px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Plug size={16} style={{ color: 'var(--accent-primary)' }} />
+              Google Workspace Account
+            </label>
             <button
-              type="button"
-              onClick={addTool}
-              disabled={connected}
+              onClick={handleGoogleConnectInOverlay}
               style={{
                 width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '14px',
-                backgroundColor: 'transparent',
-                border: '1.5px dashed var(--border-color)',
+                padding: '16px',
+                backgroundColor: googleToken ? 'rgba(255,255,255,0.05)' : 'var(--accent-primary)',
+                border: googleToken ? '1px solid var(--border-color)' : 'none',
                 borderRadius: '16px',
-                color: 'var(--text-main)',
+                color: googleToken ? 'var(--text-main)' : 'var(--accent-primary-text)',
                 fontSize: '14px',
-                fontWeight: 600,
-                marginTop: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
+                fontWeight: 700,
+                cursor: 'pointer'
               }}
             >
-              <Plus size={16} /> Add Function Call Call
+              {googleToken ? 'Google Account Connected (Refresh)' : 'Connect Google Workspace'}
             </button>
           </div>
 
-          {/* Google Workspace Connection & Permissions */}
-          <div className="form-group" style={{ marginTop: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <Plug size={16} style={{ color: '#cbfb45' }} />
-              Google Workspace Account
-            </label>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: '1.4' }}>
-              Connect your Google Account to authorize all Workspace tools (Gmail, Calendar, Drive, Docs, Sheets, Tasks, Contacts). This stores your token securely in Firestore for function calling.
-            </p>
-            
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              padding: '16px',
-              backgroundColor: 'rgba(255,255,255,0.02)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    backgroundColor: googleToken ? '#cbfb45' : '#ff4d4d',
-                    boxShadow: googleToken ? '0 0 10px #cbfb45' : '0 0 10px #ff4d4d'
-                  }}></div>
-                  <span style={{ fontSize: '14px', fontWeight: 500, color: googleToken ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                    {googleToken ? 'Google Account Connected' : 'Google Account Disconnected'}
-                  </span>
-                </div>
-                {googleToken && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', backgroundColor: 'rgba(203, 251, 69, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(203, 251, 69, 0.2)' }}>
-                    Active Token
-                  </span>
-                )}
-              </div>
+          <button className="save-now-btn" style={{ height: '60px', marginTop: '40px', borderRadius: '16px', fontSize: '18px' }} onClick={handleSavePersonaSettings}>
+            Save Profile & Activate Beatrice
+          </button>
 
-              {googleToken && (
-                <div style={{ fontSize: '12px', wordBreak: 'break-all', fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                  Token Signature: {googleToken.substring(0, 15)}...
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleGoogleConnectInOverlay}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '14px',
-                  backgroundColor: googleToken ? 'rgba(255,255,255,0.05)' : '#cbfb45',
-                  border: googleToken ? '1px solid var(--border-color)' : 'none',
-                  borderRadius: '12px',
-                  color: googleToken ? 'var(--text-main)' : '#000',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  marginTop: '4px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="icon" style={{ fontSize: '16px' }}>account_circle</span>
-                  {googleToken ? 'Reconnect / Grant Workspace Permissions' : 'Connect Google Workspace'}
-                </div>
-              </button>
-            </div>
+          <div className="danger-action" style={{ marginBottom: '40px' }} onClick={() => { auth.signOut(); setActiveOverlay(null); }}>
+             Sign Out from System
           </div>
-
-          <button className="save-now-btn" onClick={async (e) => {
-             const btn = e.currentTarget;
-             btn.textContent = 'Saving...';
-             await handleSaveSettingsAndProfile();
-             btn.textContent = 'Settings Saved!';
-             setTimeout(() => { btn.textContent = 'Save Settings'; setActiveOverlay(null); }, 1500);
-          }}>Save Settings</button>
         </div>
       </div>
 
@@ -2580,6 +2617,8 @@ Output only natural spoken text. No stage directions, no brackets, no role label
       </div>
 
       {/* WhatsApp Overlay */}
+
+      {/* WhatsApp Overlay */}
       <div id="overlay-whatsapp" className={`full-page-overlay ${activeOverlay === 'whatsapp' ? 'active' : ''}`} style={{ backgroundColor: '#0b141a' }}>
         <div className="overlay-header" style={{ backgroundColor: '#111b21', borderBottom: '1px solid #222e35' }}>
           <div className="overlay-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2600,48 +2639,83 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="step-panel active"
-                  style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
+                  style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}
                 >
-                    <div>
-                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Link your WhatsApp</h2>
-                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>Scan this QR code using WhatsApp on your device to connect this channel.</p>
+                    <div style={{ paddingBottom: '20px' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Pair your WhatsApp</h2>
+                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '20px' }}>Link your personal or business account to Eburon. This allows your AI assistant to act on your behalf, read your messages, and manage your chats.</p>
+                        
+                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid #222e35', marginBottom: '24px' }}>
+                          <div style={{ fontSize: '12px', color: '#8696a0', marginBottom: '10px' }}>Identity Reference</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ padding: '8px', backgroundColor: 'rgba(203, 251, 69, 0.1)', borderRadius: '8px', color: 'var(--accent-active)' }}><User size={16} /></div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '13px', color: '#e9edef', fontWeight: 600 }}>{auth.currentUser?.email}</span>
+                              <span style={{ fontSize: '11px', color: '#8696a0', fontFamily: 'monospace' }}>UID: {auth.currentUser?.uid?.substring(0, 12)}...</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {!qrImageUrl && (
+                          <button 
+                            onClick={fetchQRCode}
+                            disabled={qrLoading}
+                            style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%', marginBottom: '10px' }}
+                          >
+                            {qrLoading ? 'Connecting...' : 'Generate Pairing QR'}
+                          </button>
+                        )}
                     </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto 0' }}>
-                        <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.4)', marginBottom: '20px', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {qrLoading ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: '24px', height: '24px', border: '2px solid #e5e7eb', borderTopColor: '#00a884', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                                <span style={{ fontSize: '11px', color: '#888' }}>Loading QR...</span>
-                              </div>
-                            ) : qrImageUrl ? (
-                              <img src={qrImageUrl} alt="WhatsApp QR Code" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
-                            ) : (
-                              <div style={{ textAlign: 'center', padding: '20px' }}>
-                                <div style={{ fontSize: '48px', marginBottom: '8px' }}>📱</div>
-                                <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '4px' }}>QR code will appear after connection</span>
-                                <span style={{ fontSize: '11px', color: '#666' }}>Click "I Scanned" to connect using server credentials</span>
+                    {qrImageUrl && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingBottom: '20px' }}>
+                          <div style={{ backgroundColor: '#ffffff', padding: '14px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.4)', marginBottom: '16px' }}>
+                              <img src={qrImageUrl} alt="WhatsApp QR" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
+                          </div>
+                          <p style={{ fontSize: '12px', color: '#8696a0', textAlign: 'center', maxWidth: '240px', lineHeight: '1.4', marginBottom: '20px' }}>
+                            Scan this QR code with WhatsApp (Settings {'>'} Linked Devices) to pair your account.
+                          </p>
+
+                          <div style={{ width: '100%', borderTop: '1px solid #222e35', paddingTop: '20px', marginTop: '10px' }}>
+                            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#e9edef', marginBottom: '12px', textAlign: 'center' }}>Or Pair with Phone Number</h3>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                              <input 
+                                type="text"
+                                value={pairingPhone}
+                                onChange={(e) => setPairingPhone(e.target.value)}
+                                placeholder="e.g. 639056741316"
+                                style={{ flex: 1, padding: '10px', borderRadius: '8px', backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f8fafc', fontSize: '13px' }}
+                              />
+                              <button 
+                                onClick={fetchPairingCode}
+                                disabled={qrLoading}
+                                style={{ backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '8px', padding: '0 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                {qrLoading ? '...' : 'Get Code'}
+                              </button>
+                            </div>
+
+                            {pairingCode && (
+                              <div style={{ textAlign: 'center', backgroundColor: 'rgba(56, 189, 248, 0.1)', padding: '16px', borderRadius: '12px', border: '1px dashed #38bdf8' }}>
+                                <div style={{ fontSize: '11px', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Your Pairing Code</div>
+                                <div style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc', letterSpacing: '4px', fontFamily: 'monospace' }}>{pairingCode}</div>
+                                <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', lineHeight: '1.3' }}>
+                                  Go to <b>Linked Devices</b> {'>'} <b>Link with phone number instead</b> on your phone and enter this code.
+                                </p>
                               </div>
                             )}
-                        </div>
-                    </div>
+                          </div>
+                      </div>
+                    )}
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <button 
-                          onClick={handlePairWhatsapp}
-                          disabled={whatsappLoading}
-                          style={{ backgroundColor: whatsappLoading ? '#008f72' : '#00a884', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: whatsappLoading ? 'wait' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', width: '100%', opacity: whatsappLoading ? 0.7 : 1 }}
-                        >
-                            {whatsappLoading ? 'Connecting...' : 'I Scanned the QR Code'}
-                        </button>
-                        <button 
-                          onClick={regenerateQRCode}
-                          disabled={qrLoading}
-                          style={{ backgroundColor: '#202c33', color: '#e9edef', border: '1px solid #222e35', borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: 600, cursor: qrLoading ? 'wait' : 'pointer', width: '100%', opacity: qrLoading ? 0.7 : 1 }}
-                        >
-                            {qrLoading ? 'Regenerating...' : 'Regenerate QR Code'}
-                        </button>
-                    </div>
+                    {whatsappInfo?.whatsappConnected && (
+                      <button 
+                        onClick={() => setWaStep('connected')}
+                        style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#e9edef', border: '1px solid #222e35', borderRadius: '12px', padding: '12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%' }}
+                      >
+                        Finish & View Status
+                      </button>
+                    )}
                 </motion.div>
               )}
 
@@ -2652,14 +2726,14 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   className="step-panel"
-                  style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}
+                  style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}
                 >
-                    <div>
-                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>Channel Paired</h2>
-                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '24px' }}>This phone number is registered and active as a user instance under your main business account.</p>
+                    <div style={{ paddingBottom: '20px' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>WhatsApp Connected</h2>
+                        <p style={{ fontSize: '13px', color: '#8696a0', lineHeight: 1.5, textAlign: 'center', marginBottom: '20px' }}>Beatrice is linked to your WhatsApp via our business channel.</p>
                     </div>
 
-                    <div style={{ backgroundColor: '#111b21', border: '1px solid #222e35', borderRadius: '16px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: 'auto 0' }}>
+                    <div style={{ backgroundColor: '#111b21', border: '1px solid #222e35', borderRadius: '16px', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
                         <div style={{ position: 'relative', marginBottom: '16px' }}>
                             <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#202c33', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #00a884', overflow: 'hidden' }}>
                                 <svg width="40" height="40" viewBox="0 0 24 24" fill="#8696a0">
@@ -2668,14 +2742,39 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                             </div>
                             <div style={{ width: '14px', height: '14px', backgroundColor: '#25d366', border: '2px solid #111b21', borderRadius: '50%', position: 'absolute', bottom: '3px', right: '3px' }}></div>
                         </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#e9edef', marginBottom: '4px' }}>{whatsappInfo?.whatsappDisplayName || 'Connected Account'}</div>
+                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#e9edef', marginBottom: '4px' }}>{whatsappInfo?.whatsappDisplayName || 'AI Assistant'}</div>
                         <div style={{ fontSize: '14px', color: '#8696a0', marginBottom: '16px' }}>{whatsappInfo?.whatsappPhone || ''}</div>
-                        <span style={{ backgroundColor: 'rgba(0, 168, 132, 0.12)', color: '#00a884', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Active Channel</span>
+                        <span style={{ backgroundColor: 'rgba(0, 168, 132, 0.12)', color: '#00a884', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Active Identity</span>
                     </div>
 
-                    <div>
-                        <button onClick={handleDisconnectWhatsapp} style={{ backgroundColor: 'transparent', color: '#ea0038', border: '1px solid #ea0038', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
-                            Disconnect Channel
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid #222e35', marginBottom: '24px' }}>
+                      <div style={{ fontSize: '11px', color: '#8696a0', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginBottom: '4px' }}>Active Permissions</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '13px', color: '#e9edef' }}>Receive Messages</span>
+                        <button onClick={() => toggleWaPerm('receive')} style={{ background: 'none', border: 'none', color: waPerms.receive ? '#00a884' : '#555', cursor: 'pointer' }}>
+                          {waPerms.receive ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '13px', color: '#e9edef' }}>Send Messages</span>
+                        <button onClick={() => toggleWaPerm('send')} style={{ background: 'none', border: 'none', color: waPerms.send ? '#00a884' : '#555', cursor: 'pointer' }}>
+                          {waPerms.send ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '13px', color: '#e9edef' }}>AI Action Power</span>
+                        <button onClick={() => toggleWaPerm('autoSend')} style={{ background: 'none', border: 'none', color: waPerms.autoSend ? '#00a884' : '#555', cursor: 'pointer' }}>
+                          {waPerms.autoSend ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '20px' }}>
+                        <button onClick={handleSaveWaPermissions} style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                            Update Permissions
+                        </button>
+                        <button onClick={handleDisconnectWhatsapp} style={{ backgroundColor: 'transparent', color: '#ea0038', border: '1px solid #ea0038', borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                            Disconnect Account
                         </button>
                     </div>
                 </motion.div>
@@ -2692,18 +2791,35 @@ Output only natural spoken text. No stage directions, no brackets, no role label
           <button className="close-overlay-btn" onClick={() => setActiveOverlay(null)}><X size={18} /></button>
         </div>
         <div className="overlay-content" style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '400px', aspectRatio: '3/4', backgroundColor: '#000', borderRadius: '16px', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="scanner-container" style={{ width: '100%', maxWidth: '400px', aspectRatio: '3/4', backgroundColor: '#000' }}>
+            <div className="scanner-laser" />
+            <div className="scanner-pulse" />
             {activeOverlay === 'scanner' ? (
               <Scanner
                 onScan={(result) => {
                   if (result && result.length > 0) {
                     const text = result[0].rawValue;
                     setActiveOverlay(null);
-                    const scanMsg = `Supermarket Scanner scan: "${text}". Please identify this product, its nutritional info, and check if it is available nearby.`;
+                    const scanMsg = `Supermarket Scanner scan: "${text}". Boss just scanned this product! Identify it precisely in ${personaLanguage}, tell an exciting story about its origin or ingredients, and give me some legitimate, mind-blowing trivia. Make it sound exciting!`;
                     if (connected) client.send({ text: scanMsg });
                     useLogStore.getState().addTurn({ role: 'user', text: scanMsg, isFinal: true });
                   }
                 }}
+                formats={[
+                  'qr_code',
+                  'ean_13',
+                  'ean_8',
+                  'upc_a',
+                  'upc_e',
+                  'code_128',
+                  'code_39',
+                  'code_93',
+                  'itf',
+                  'codabar',
+                  'aztec',
+                  'data_matrix',
+                  'pdf417'
+                ]}
                 components={{
                   tracker: true,
                   audio: false,
@@ -2715,16 +2831,6 @@ Output only natural spoken text. No stage directions, no brackets, no role label
               />
             ) : <Video size={48} color="#444" />}
           </div>
-          <div className="form-group" style={{ width: '100%', maxWidth: '400px', marginTop: '24px' }}>
-            <label>Translate to</label>
-            <select className="form-control" defaultValue="en">
-              <option value="en">English</option>
-              <option value="nl">Dutch (Flemish)</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="es">Spanish</option>
-            </select>
-          </div>
 
           <div style={{ width: '100%', maxWidth: '400px', marginTop: '20px' }}>
              <h4 style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Scan Simulator</h4>
@@ -2734,7 +2840,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', width: '100%', fontSize: '13px', textAlign: 'left', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', cursor: 'pointer', borderRadius: '8px' }}
                   onClick={() => {
                      setActiveOverlay(null);
-                     const scanMsg = `Supermarket Scanner scan: "5411188112920". Alpro Barista Oat Milk. Please identify nutritional specifications, ingredients, allergen warnings, and confirm Belgium availability!`;
+                     const scanMsg = `Supermarket Scanner scan: "5411188112920". Boss just scanned Alpro Barista Oat Milk! Identify it precisely, tell an exciting story about it, and give me some legitimate, mind-blowing trivia. Make it sound exciting!`;
                      if (connected) client.send({ text: scanMsg });
                      useLogStore.getState().addTurn({ role: 'user', text: scanMsg, isFinal: true });
                   }}
@@ -2747,7 +2853,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', width: '100%', fontSize: '13px', textAlign: 'left', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', cursor: 'pointer', borderRadius: '8px' }}
                   onClick={() => {
                      setActiveOverlay(null);
-                     const scanMsg = `Supermarket Scanner scan: "5410126006152". Lotus Biscoff Cookies. Please identify nutritional specifications, ingredients, allergen warnings, and confirm Belgium availability!`;
+                     const scanMsg = `Supermarket Scanner scan: "5410126006152". Boss just scanned Lotus Biscoff Cookies! Identify it precisely, tell an exciting story about it, and give me some legitimate, mind-blowing trivia. Make it sound exciting!`;
                      if (connected) client.send({ text: scanMsg });
                      useLogStore.getState().addTurn({ role: 'user', text: scanMsg, isFinal: true });
                   }}
@@ -2760,7 +2866,7 @@ Output only natural spoken text. No stage directions, no brackets, no role label
                   style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', width: '100%', fontSize: '13px', textAlign: 'left', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', cursor: 'pointer', borderRadius: '8px' }}
                   onClick={() => {
                      setActiveOverlay(null);
-                     const scanMsg = `Supermarket Scanner scan: "5410228141447". Stella Artois Belgian Beer. Please identify nutritional specifications, ingredients, allergen warnings, and confirm Belgium availability!`;
+                     const scanMsg = `Supermarket Scanner scan: "5410228141447". Boss just scanned Stella Artois Belgian Beer! Identify it precisely, tell an exciting story about it, and give me some legitimate, mind-blowing trivia. Make it sound exciting!`;
                      if (connected) client.send({ text: scanMsg });
                      useLogStore.getState().addTurn({ role: 'user', text: scanMsg, isFinal: true });
                   }}
