@@ -507,6 +507,8 @@ export const useUI = create<{
   setActiveOverlay: (overlay: string | null) => void;
   isGenerating: boolean;
   setIsGenerating: (isGenerating: boolean) => void;
+  showSecondaryUI: boolean;
+  setShowSecondaryUI: (show: boolean) => void;
 }>(set => ({
   isSidebarOpen: true,
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
@@ -516,6 +518,8 @@ export const useUI = create<{
   setActiveOverlay: (overlay) => set({ activeOverlay: overlay }),
   isGenerating: false,
   setIsGenerating: (isGenerating) => set({ isGenerating }),
+  showSecondaryUI: false,
+  setShowSecondaryUI: (show) => set({ showSecondaryUI: show }),
 }));
 
 /**

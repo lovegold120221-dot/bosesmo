@@ -94,7 +94,7 @@ export default function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[#222]">
           <div className="flex items-center gap-2">
-            <Sliders size={20} className="text-[#cbfb45]" />
+            <Sliders size={20} className="text-[#CAF645]" />
             <span className="font-semibold text-lg text-white">Assistant Setup</span>
           </div>
           <button 
@@ -112,7 +112,7 @@ export default function Sidebar() {
           {/* Identity Info */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-[#222] pb-2">
-              <User size={14} className="text-[#cbfb45]" />
+              <User size={14} className="text-[#CAF645]" />
               Persona Identity
             </h4>
 
@@ -124,7 +124,7 @@ export default function Sidebar() {
                 value={personaName}
                 onChange={e => setPersonaName(e.target.value)}
                 disabled={connected}
-                className="w-full bg-[#151515] border border-[#222] rounded-xl px-4 py-3 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors"
+                className="w-full bg-[#151515] border border-[#222] rounded-xl px-4 py-3 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors"
                 placeholder="e.g. Beatrice"
               />
             </div>
@@ -137,7 +137,7 @@ export default function Sidebar() {
                 value={userCallName}
                 onChange={e => setUserCallName(e.target.value)}
                 disabled={connected}
-                className="w-full bg-[#151515] border border-[#222] rounded-xl px-4 py-3 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors"
+                className="w-full bg-[#151515] border border-[#222] rounded-xl px-4 py-3 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors"
                 placeholder="e.g. Boss"
               />
             </div>
@@ -146,7 +146,7 @@ export default function Sidebar() {
           {/* Localization & Sound */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-[#222] pb-2">
-              <Volume2 size={14} className="text-[#cbfb45]" />
+              <Volume2 size={14} className="text-[#CAF645]" />
               Voice and Language
             </h4>
 
@@ -158,7 +158,7 @@ export default function Sidebar() {
                   value={voice} 
                   onChange={e => setVoice(e.target.value)}
                   disabled={connected}
-                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors cursor-pointer"
+                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {AVAILABLE_VOICES.map(v => (
                     <option key={v} value={v}>
@@ -180,7 +180,7 @@ export default function Sidebar() {
                   value={language} 
                   onChange={e => setLanguage(e.target.value)}
                   disabled={connected}
-                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors cursor-pointer"
+                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {LANGUAGES.map(lang => (
                     <option key={lang} value={lang}>
@@ -198,7 +198,7 @@ export default function Sidebar() {
           {/* AI Intelligence config */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-[#222] pb-2">
-              <FileText size={14} className="text-[#cbfb45]" />
+              <FileText size={14} className="text-[#CAF645]" />
               AI System prompt
             </h4>
 
@@ -209,7 +209,7 @@ export default function Sidebar() {
                 onChange={e => setSystemPrompt(e.target.value)}
                 disabled={connected}
                 rows={6}
-                className="w-full bg-[#151515] border border-[#222] rounded-xl p-4 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors resize-none leading-relaxed"
+                className="w-full bg-[#151515] border border-[#222] rounded-xl p-4 placeholder-gray-600 font-medium text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors resize-none leading-relaxed"
                 placeholder="Give Beatrice specific instructions on how to behave, respond, and customize context..."
               />
             </div>
@@ -222,7 +222,7 @@ export default function Sidebar() {
                   value={model} 
                   onChange={e => setModel(e.target.value)}
                   disabled={connected}
-                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#cbfb45] disabled:opacity-50 transition-colors cursor-pointer"
+                  className="w-full appearance-none bg-[#151515] border border-[#222] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#CAF645] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {AVAILABLE_MODELS.map(m => (
                     <option key={m} value={m}>
@@ -240,7 +240,7 @@ export default function Sidebar() {
           {/* Tools Toggle & Custom Configuration Section */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-[#222] pb-2">
-              <Cpu size={14} className="text-[#cbfb45]" />
+              <Cpu size={14} className="text-[#CAF645]" />
               Dynamic Tools Map
             </h4>
 
@@ -261,7 +261,7 @@ export default function Sidebar() {
                     />
                     <span className="text-gray-400 hover:text-white transition-colors">
                       {tool.isEnabled ? (
-                        <CheckSquare size={18} className="text-[#cbfb45]" />
+                        <CheckSquare size={18} className="text-[#CAF645]" />
                       ) : (
                         <Square size={18} />
                       )}
@@ -310,10 +310,10 @@ export default function Sidebar() {
             onClick={handleSaveSettings}
             className={c(
               "w-full py-3.5 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-1.5",
-              saveStatus === 'saved' ? "bg-[#00d97e] text-white" :
+              saveStatus === 'saved' ? "bg-[#1590F5] text-white" :
               saveStatus === 'saving' ? "bg-gray-700 text-gray-300 pointer-events-none" :
               saveStatus === 'error' ? "bg-red-600 text-white" :
-              "bg-[#cbfb45] text-black hover:opacity-90 active:scale-[0.98]"
+              "bg-[#CAF645] text-black hover:opacity-90 active:scale-[0.98]"
             )}
           >
             {saveStatus === 'saving' && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}

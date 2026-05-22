@@ -457,7 +457,7 @@ export const ArtifactOverlay: React.FC = () => {
         {/* Tab Bar */}
         <div className="flex items-center bg-[#252525] border-b border-white/5 h-[28px] px-1 gap-[2px]">
           <div className="flex items-center bg-[#1e1e1e] h-[22px] px-3 rounded-t-[6px] border border-white/5 border-b-0">
-            <FileText size={10} className="text-[#cbfb45] mr-1.5 shrink-0" />
+            <FileText size={10} className="text-[#CAF645] mr-1.5 shrink-0" />
             <span className="text-[10px] text-[#ccc] truncate max-w-[140px]">{activeWorkspaceResult?.artifact?.title || 'Document'}</span>
           </div>
         </div>
@@ -477,11 +477,11 @@ export const ArtifactOverlay: React.FC = () => {
       </div>
 
       {/* Desktop Viewport — content area */}
-      <div className="flex-1 overflow-hidden bg-[#f5f5f5] relative">
+      <div className="flex-1 overflow-hidden bg-[#F5F5F5] relative">
         {isGenerating ? (
           <div className="flex items-center justify-center h-full w-full bg-[#fafafa] text-[#888]">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-8 h-8 border-2 border-t-[#cbfb45] border-[#333] rounded-full animate-spin" />
+              <div className="w-8 h-8 border-2 border-t-[#CAF645] border-[#333] rounded-full animate-spin" />
               <p className="text-xs font-mono tracking-widest text-[#666] uppercase animate-pulse">Generating Document...</p>
             </div>
           </div>
@@ -545,7 +545,7 @@ export const ArtifactOverlay: React.FC = () => {
                         li: ({node, ...props}) => <li className="text-[12px] text-gray-700 leading-relaxed" {...props}/>,
                         strong: ({node, ...props}) => <strong className="font-bold text-gray-950" {...props}/>,
                         em: ({node, ...props}) => <em className="italic text-gray-900" {...props}/>,
-                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#cbfb45] pl-4 py-2 italic my-4 text-gray-600 bg-gray-50 rounded-r text-[12px] leading-relaxed" {...props}/>,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#CAF645] pl-4 py-2 italic my-4 text-gray-600 bg-gray-50 rounded-r text-[12px] leading-relaxed" {...props}/>,
                         code: ({node, className, children, ...props}: any) => {
                           const inline = !className || !className.includes('language-');
                           return inline ? (

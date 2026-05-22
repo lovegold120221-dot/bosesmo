@@ -79,4 +79,47 @@ export const personalAssistantTools: FunctionCall[] = [
     isEnabled: true,
     scheduling: FunctionResponseScheduling.INTERRUPT,
   },
+  {
+    name: 'recall_memory',
+    description: 'Searches through long-term semantic memory to recall past conversations, specific details, or learned preferences about the Boss. Use this whenever the Boss asks about something previously discussed or when you need context from the past.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: {
+          type: 'STRING',
+          description: 'The semantic search query (e.g., "what did we say about the project deadline?").',
+        },
+      },
+      required: ['query'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
+    name: 'show_secondary_ui',
+    description: 'Reveals the secondary dashboard interface with buttons, settings, and activity logs. Use this ONLY when the user explicitly asks to "show the buttons", "show overview", or "what can you do".',
+    parameters: {
+      type: 'OBJECT',
+      properties: {},
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
+    name: 'manage_camera',
+    description: 'Controls the user\'s camera interface. Use this when the user says "open my camera", "flip camera", or "close camera".',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        action: {
+          type: 'STRING',
+          enum: ['open', 'flip', 'close'],
+          description: 'The camera action to perform.',
+        },
+      },
+      required: ['action'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
 ];

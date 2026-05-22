@@ -18,9 +18,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 const firestoreId = firebaseConfig.firestoreDatabaseId || '';
+console.log(`[Firebase] Initializing Firestore with Database ID: ${firestoreId || '(default)'}`);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
-}, firestoreId === '' ? undefined : firestoreId); /* CRITICAL: The app will break without this line */
+}, firestoreId === '' ? undefined : firestoreId);
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({

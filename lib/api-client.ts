@@ -97,3 +97,8 @@ export const sendWhatsappMessage = async (phone: string, text: string) => {
   const token = await getToken();
   return apiClient.post('/api/whatsapp/send', { phone, text }, token);
 };
+
+export const getWhatsappMessages = async (limit = 20) => {
+  const token = await getToken();
+  return apiClient.get(`/api/whatsapp/messages?limit=${limit}`, token);
+};
