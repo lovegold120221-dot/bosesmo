@@ -207,6 +207,24 @@ async function startServer() {
     }
   });
 
+  app.post('/api/sandbox/execute', authenticateToken, async (req: any, res) => {
+    const { command } = req.body;
+    if (!command) {
+      return res.status(400).json({ error: 'Command is required' });
+    }
+    
+    console.log(`Executing sandbox command: ${command}`);
+    
+    const { exec } = await import('child_process');
+    exec(command, (error, stdout, stderr) => {
+      res.json({
+        stdout,
+        stderr,
+        error: error ? error.message : null
+      });
+    });
+  });
+
   // Settings (Migrated to Firestore)
   app.get('/api/settings', authenticateToken, async (req: any, res) => {
     try {

@@ -114,6 +114,13 @@ export function useLiveApi({
              lower.includes('duration');
     };
 
+    const isDepletedError = (msg: string): boolean => {
+      const lower = msg.toLowerCase();
+      return lower.includes('prepayment') || 
+             lower.includes('credits') || 
+             lower.includes('depleted');
+    };
+
     const showSystemError = (text: string) => {
       const turns = useLogStore.getState().turns;
       const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
@@ -153,12 +160,15 @@ export function useLiveApi({
       const errMsg = getErrorMessage(e);
       const isQuota = isQuotaError(reason) || isQuotaError(errMsg);
       const isGoAway = isGoAwayError(reason) || isGoAwayError(errMsg);
+      const isDepleted = isDepletedError(reason) || isDepletedError(errMsg);
 
-      if (errorShownThisSessionRef.current && !isQuota && !isGoAway) {
+      if (errorShownThisSessionRef.current && !isQuota && !isGoAway && !isDepleted) {
         return;
       }
 
-      if (isQuota) {
+      if (isDepleted) {
+        showSystemError("🕒 **Eburon AI is deploying new update**");
+      } else if (isQuota) {
         showSystemError("⚠️ **Eburon Live API Quota Exceeded:** You have reached your workspace free tier quota limits. Live API sessions are rate-limited on the free plan. If you require higher limits, you can configure a Pay-As-You-Go plan in your settings, or try again tomorrow.");
       } else if (isGoAway) {
         showSystemError("🕒 **Session Timeout:** The standard Eburon Live session duration limit was reached. You can easily start a new session by clicking **Reconnect**.");
@@ -171,6 +181,7 @@ export function useLiveApi({
       const errMsg = getErrorMessage(e);
       const isQuota = isQuotaError(errMsg);
       const isGoAway = isGoAwayError(errMsg);
+      const isDepleted = isDepletedError(errMsg);
 
       if (isQuota) {
         console.warn("Live API connection closed or rate-limited: Quota Exceeded");
@@ -182,11 +193,13 @@ export function useLiveApi({
         return;
       }
 
-      if (errorShownThisSessionRef.current && !isQuota && !isGoAway) {
+      if (errorShownThisSessionRef.current && !isQuota && !isGoAway && !isDepleted) {
         return;
       }
 
-      if (isQuota) {
+      if (isDepleted) {
+        showSystemError("🕒 **Eburon AI is deploying new update**");
+      } else if (isQuota) {
         showSystemError("⚠️ **Eburon Live API Quota Exceeded:** You have reached your workspace free tier quota limits. Live API sessions are rate-limited on the free plan. If you require higher limits, you can configure a Pay-As-You-Go plan in your settings, or try again tomorrow.");
       } else if (isGoAway) {
         showSystemError("🕒 **Session Timeout:** The standard Eburon Live session duration limit was reached. You can easily start a new session by clicking **Reconnect**.");
@@ -809,6 +822,24 @@ export function useLiveApi({
                 }
             });
             responsePayload = await responsePayload;
+        }
+
+        if (fc.name === 'execute_shell_command') {
+            const { command } = fc.args as any;
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                const res = await fetch('/api/sandbox/execute', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ command })
+                });
+                responsePayload = await res.json();
+            } catch (e: any) {
+                responsePayload = { error: e.message };
+            }
         }
 
         // Prepare the response
